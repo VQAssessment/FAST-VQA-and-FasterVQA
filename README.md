@@ -1,8 +1,12 @@
-# STAFF-VQ
+# FAST-VQA
 
-The official open source inference code for paper 'Spatial-Temporal Aligned Fractal Fragments for Video Quality Assessment'.
+The official open source inference code for future paper 'Learning Video Quality Assessment with Fragments Aligned Spatially and Temporally'.
 
-This repo is now only for the baseline model (without Fractal Fragments).
+## Future Ideas
+
+- Distance-based Position Embedding (DBPE)
+- Fractal Fragments (Fra^2^)
+- Adaptive Fragment Selection (AFS)
 
 ## Demos
 
@@ -11,7 +15,7 @@ This repo is now only for the baseline model (without Fractal Fragments).
 ![Demo](./demos/demo_A004.mp4.png)
 
 
-With the fragments, the proposed model can distinguish quality defects both on **Bad Content** and **Technical Distortion**.
+With the fragments, the proposed FAST-VQA can distinguish quality defects both on **Perceptually Unfavorable Content** and **Spatial-Temporal Technical Distortion** and robustly predicts the video quality across different VQA databases. It can also predict a video's quality with 0.02s, which is SUPER FAST comparing with traditional methods. 
 
 See in [demos](./demos/) for more examples.
 
