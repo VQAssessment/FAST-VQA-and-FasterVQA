@@ -7,8 +7,10 @@ import numpy as np
 import torch
 decord.bridge.set_bridge('torch')
 
-def get_fragments(video, fragments, fsize=32, aligned=32):
-    
+def get_fragments(video, fragments=7, fsize=32, aligned=32, random=True):
+    size = fragments * fsize
+    if min(video.shape[-2:]) < size:
+        video = torch.nn.functional.interpolate(video, scale_factor = size / min(video.shape[-2:]), mode='bilinear')
     dur_t, res_h, res_w = video.shape[-3:]
     assert dur_t % aligned == 0, 'Please provide match vclip and align index'
     size = (fragments * fsize, fragments * fsize)
@@ -17,14 +19,24 @@ def get_fragments(video, fragments, fsize=32, aligned=32):
     wgrids = torch.LongTensor([res_w // fragments * i for i in range(fragments)])
     hlength, wlength = res_h // fragments, res_w // fragments
     
-    if hlength > fsize:
-        rnd_h = torch.randint(hlength - fsize, (len(hgrids), len(wgrids), dur_t // aligned))
+    if random:
+        if hlength > fsize:
+            rnd_h = torch.randint(hlength - fsize, (len(hgrids), len(wgrids), dur_t // aligned))
+        else:
+            rnd_h = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
+        if wlength > fsize:
+            rnd_w = torch.randint(wlength - fsize, (len(hgrids), len(wgrids), dur_t // aligned))
+        else:
+            rnd_w = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
     else:
-        rnd_h = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
-    if wlength > fsize:
-        rnd_w = torch.randint(wlength - fsize, (len(hgrids), len(wgrids), dur_t // aligned))
-    else:
-        rnd_w = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
+        if hlength > fsize:
+            dtm_h = (hlength - fsize) // 2
+        else:
+            dtm_h = 0
+        if wlength > fsize:
+            dtm_w = (wlength - fsize) // 2
+        else:
+            dtm_w = 0
     
     target_video = torch.zeros(video.shape[:-2] + size).to(video.device)
         
@@ -34,8 +46,12 @@ def get_fragments(video, fragments, fsize=32, aligned=32):
                 t_s, t_e = t * aligned, (t+1) * aligned
                 h_s, h_e = i * fsize, (i+1) * fsize
                 w_s, w_e = j * fsize, (j+1) * fsize
-                h_so, h_eo = hs + rnd_h[i][j][t], hs + rnd_h[i][j][t] + fsize
-                w_so, w_eo = ws + rnd_w[i][j][t], ws + rnd_w[i][j][t] + fsize
+                if random:
+                    h_so, h_eo = hs + rnd_h[i][j][t], hs + rnd_h[i][j][t] + fsize
+                    w_so, w_eo = ws + rnd_w[i][j][t], ws + rnd_w[i][j][t] + fsize
+                else:
+                    h_so, h_eo = hs + dtm_h, hs + dtm_h + fsize
+                    w_so, w_eo = ws + dtm_w, ws + dtm_w + fsize
                 target_video[:,t_s:t_e,h_s:h_e,w_s:w_e] = video[:,t_s:t_e,h_so:h_eo,w_so:w_eo]
     return target_video
 
@@ -87,12 +103,15 @@ class SampleFrames:
 
 
 class VQAInferenceDataset(torch.utils.data.Dataset):
-    def __init__(self, ann_file, data_prefix, clip_len=32, frame_interval=2, num_clips=4, aligned=32):
+    def __init__(self, ann_file, data_prefix, clip_len=32, frame_interval=2, num_clips=4, aligned=32, fragments=7, fsize=32, nfrags=8):
         self.ann_file = ann_file
         self.data_prefix = data_prefix
         self.clip_len = clip_len
         self.frame_interval = frame_interval
         self.num_clips = num_clips
+        self.fragments = fragments
+        self.fsize = fsize
+        self.nfrags = nfrags
         self.sampler = SampleFrames(clip_len, frame_interval, num_clips)
         self.video_infos = []
         self.mean=torch.Tensor([123.675, 116.28, 103.53])
@@ -105,7 +124,11 @@ class VQAInferenceDataset(torch.utils.data.Dataset):
                 filename = osp.join(self.data_prefix, filename)
                 self.video_infos.append(dict(filename=filename, label=label))
                 
-    def __getitem__(self, index):
+    def __getitem__(self, index, fragments=-1, fsize=-1):
+        if fragments == -1:
+            fragments = self.fragments
+        if fsize == -1:
+            fsize = self.fsize
         video_info = self.video_infos[index]
         filename = video_info['filename']
         label = video_info['label']
@@ -118,8 +141,13 @@ class VQAInferenceDataset(torch.utils.data.Dataset):
         imgs = [frame_dict[idx] for idx in frame_inds]
         video = torch.stack(imgs, 0)
         video = ((video - self.mean) / self.std).permute(3, 0, 1, 2)
-        vfrag = get_fragments(video, 7)
-        return {'video': vfrag.reshape((-1, self.num_clips, self.clip_len) + vfrag.shape[2:]).transpose(0,1), 
+        if self.nfrags == 1:
+            vfrag = get_fragments(video, fragments, fsize)
+        else: 
+            vfrag = get_fragments(video, fragments, fsize)
+            for i in range(1, self.nfrags):
+                vfrag = torch.cat((vfrag, get_fragments(video, fragments, fsize)), 1)
+        return {'video': vfrag.reshape((-1, self.nfrags * self.num_clips, self.clip_len) + vfrag.shape[2:]).transpose(0,1), 
                 'frame_inds': frame_inds,
                 'gt_label': label,
                }
