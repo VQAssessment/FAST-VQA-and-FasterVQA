@@ -15,7 +15,9 @@ decord.bridge.set_bridge('torch')
 def get_fragments(video, fragments=7, fsize=32, aligned=32, random=True):
     size = fragments * fsize
     if min(video.shape[-2:]) < size:
-        video = torch.nn.functional.interpolate(video, scale_factor = size / min(video.shape[-2:]), mode='bilinear')
+        ovideo = video
+        video = torch.nn.functional.interpolate(video / 255., scale_factor = size / min(video.shape[-2:]), mode='bilinear')
+        video = (video * 255.).type_as(ovideo)
     dur_t, res_h, res_w = video.shape[-3:]
     assert dur_t % aligned == 0, 'Please provide match vclip and align index'
     size = (fragments * fsize, fragments * fsize)
@@ -43,27 +45,25 @@ def get_fragments(video, fragments=7, fsize=32, aligned=32, random=True):
         else:
             dtm_w = 0
     
-    #target_video = torch.zeros(video.shape[:-2] + size).to(video.device)
-    target_videos = []
+    target_video = torch.zeros(video.shape[:-2] + size).to(video.device)
+    #target_videos = []
         
     for i, hs in enumerate(hgrids):
         for j, ws in enumerate(wgrids):
             for t in range(dur_t // aligned):
                 t_s, t_e = t * aligned, (t+1) * aligned
-                #h_s, h_e = i * fsize, (i+1) * fsize
-                #w_s, w_e = j * fsize, (j+1) * fsize
+                h_s, h_e = i * fsize, (i+1) * fsize
+                w_s, w_e = j * fsize, (j+1) * fsize
                 if random:
                     h_so, h_eo = hs + rnd_h[i][j][t], hs + rnd_h[i][j][t] + fsize
                     w_so, w_eo = ws + rnd_w[i][j][t], ws + rnd_w[i][j][t] + fsize
                 else:
                     h_so, h_eo = hs + dtm_h, hs + dtm_h + fsize
                     w_so, w_eo = ws + dtm_w, ws + dtm_w + fsize
-                #target_video[:,t_s:t_e,h_s:h_e,w_s:w_e] = video[:,t_s:t_e,h_so:h_eo,w_so:w_eo]
-                target_videos.append(video[:,t_s:t_e,h_so:h_eo,w_so:w_eo])
-    target_video = torch.stack(target_videos, 0).reshape((dur_t // aligned, fragments, fragments,) + target_videos[0].shape).permute(3,0,4,1,5,2,6)
-    print(target_video.shape)
-    target_video = target_video.reshape((-1, dur_t,) + size) ## Splicing Fragments
-    print(target_video.shape)
+                target_video[:,t_s:t_e,h_s:h_e,w_s:w_e] = video[:,t_s:t_e,h_so:h_eo,w_so:w_eo]
+    #target_videos.append(video[:,t_s:t_e,h_so:h_eo,w_so:w_eo])
+    #target_video = torch.stack(target_videos, 0).reshape((dur_t // aligned, fragments, fragments,) + target_videos[0].shape).permute(3,0,4,1,5,2,6)
+    #target_video = target_video.reshape((-1, dur_t,) + size) ## Splicing Fragments
     return target_video
 
 class SampleFrames:

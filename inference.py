@@ -1,8 +1,8 @@
 import torch
 import cv2
 import random
-from models import BaseEvaluator
-from datasets import VQAInferenceDataset, get_fragments
+from fastvqa.models import BaseEvaluator
+from fastvqa.datasets import VQAInferenceDataset, get_fragments
 
 import argparse
 
@@ -74,10 +74,10 @@ def predict_dataset(args, dataset, model, device):
 def main():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', choices=['LIVE_VQC', 'LSVQ', 'KoNViD', 'CVD2014', 'all'], default='LIVE_VQC', help='the inference dataset name')
+    parser.add_argument('-d', '--dataset', choices=['LIVE_VQC', 'LSVQ', 'KoNViD', 'CVD2014', 'all'], default='LIVE_VQC', help='the inference dataset name')
     parser.add_argument('--pdpath', type=str, default='../datasets/', help='the inference dataset name')
-    parser.add_argument('--fsize', choices=[8, 16, 32], default=32, help='size of fragment strips')
-    parser.add_argument('--famount', type=int, default=1, help='sample amount of fragment strips')
+    parser.add_argument('-s', '--fsize', choices=[8, 16, 32], default=32, help='size of fragment strips')
+    parser.add_argument('-a', '--famount', type=int, default=1, help='sample amount of fragment strips')
     parser.add_argument('--save_dir', type=str, default='results', help='results_dir')
     parser.add_argument('--cache', action='store_true', help='use_cache_dataset')
     
@@ -94,7 +94,9 @@ def main():
     ## defining model and loading checkpoint
 
     model = BaseEvaluator().to(device)
-    load_path = f'pretrained_weights/all_aligned_fragments_{args.fsize}.pth'
+    if args.fsize != 32:
+        raise NotImplementedError('Version 0.2.0 does not support fragment size other than 32.')
+    load_path = f'pretrained_weights/all_aligned_fragments_v0_2.pth'
     state_dict = torch.load(load_path, map_location='cpu')
 
     if 'state_dict' in state_dict:
@@ -102,6 +104,7 @@ def main():
         from collections import OrderedDict
         i_state_dict = OrderedDict()
         for key in state_dict.keys():
+            print(key)
             if 'cls' in key:
                 tkey = key.replace('cls', 'vqa')
                 i_state_dict[tkey] = state_dict[key]

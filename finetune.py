@@ -2,8 +2,8 @@ import torch
 import cv2
 import random
 import os.path as osp
-from models import BaseEvaluator
-from datasets import VQAInferenceDataset, get_fragments
+from fastvqa.models import BaseEvaluator
+from fastvqa.datasets import VQAInferenceDataset, get_fragments
 
 import argparse
 
@@ -154,15 +154,15 @@ def inference_set(inf_loader, model, device, best_):
 def main():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', choices=['LIVE_VQC', 'KoNViD', 'CVD2014'], default='LIVE_VQC', help='the finetune dataset name')
+    parser.add_argument('-d', '--dataset', choices=['LIVE_VQC', 'KoNViD', 'CVD2014'], default='LIVE_VQC', help='the finetune dataset name')
     parser.add_argument('--pdpath', type=str, default='../datasets/', help='the inference dataset name')
-    parser.add_argument('--fsize', choices=[8, 16, 32], default=32, help='size of fragment strips')
-    parser.add_argument('--famount', type=int, default=1, help='sample amount of fragment strips')
-    parser.add_argument('--l_num_epochs', type=int, default=10, help='linear finetune epochs')
-    parser.add_argument('--num_epochs', type=int, default=20, help='finetune epochs')
+    parser.add_argument('-s', '--fsize', choices=[8, 16, 32], default=32, help='size of fragment strips')
+    parser.add_argument('-a', '--famount', type=int, default=1, help='sample amount of fragment strips')
+    parser.add_argument('-lep', '--l_num_epochs', type=int, default=10, help='linear finetune epochs')
+    parser.add_argument('-ep', '--num_epochs', type=int, default=20, help='finetune epochs')
     parser.add_argument('--save_dir', type=str, default='results', help='results_dir')
-    parser.add_argument('--cache', action='store_true', help='use_cache_dataset')
-    parser.add_argument('--from_ar', action='store_true', help='use_features_from_action_recognition')
+    parser.add_argument('-c', '--cache', action='store_true', help='use_cache_dataset')
+    parser.add_argument('-var', '--from_ar', action='store_true', help='use_features_from_action_recognition')
 
 
     
@@ -189,7 +189,9 @@ def main():
         if args.from_ar:
             load_path = '../model_baselines/NetArch/swin_tiny_patch244_window877_kinetics400_1k.pth'
         else:
-            load_path = f'pretrained_weights/all_aligned_fragments_{args.fsize}.pth'
+            if args.fsize != 32:
+                raise NotImplementedError('Version 0.2.0 only supports 32*32 finetune on fragments.')
+            load_path = f'pretrained_weights/all_aligned_fragments_v0_2.pth'
         state_dict = torch.load(load_path, map_location='cpu')
 
         if 'state_dict' in state_dict:
@@ -199,7 +201,7 @@ def main():
             for key in state_dict.keys():
                 if 'cls' in key:
                     tkey = key.replace('cls', 'vqa')
-                    if args.l_num_epochs == 0:
+                    if args.l_num_epochs == 0 and not args.from_ar:
                         i_state_dict[tkey] = state_dict[key]
                 else:
                     i_state_dict[key] = state_dict[key]

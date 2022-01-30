@@ -5,16 +5,30 @@ import torch.utils.checkpoint as checkpoint
 import numpy as np
 from timm.models.layers import DropPath, trunc_normal_
 
-
 from functools import reduce, lru_cache
 from operator import mul
 from einops import rearrange
 
-def fragment_mask(D, H, W, fragments=7, device='cuda'):
-    m = torch.arange(fragments).reshape(-1, 1).float()
-    m = (m + m.t() * fragments)
-    m = m.reshape((1, 1, 1) + m.shape)
-    return F.interpolate(m.to(device), size=(D, H, W))
+
+def fragment_infos(D, H, W, fragments=7, device='cuda'):
+    m = torch.arange(fragments).unsqueeze(-1).float()
+    m = (m + m.t() * fragments).reshape(1, 1, 1, fragments, fragments)
+    m = F.interpolate(m.to(device), size=(D, H, W)).permute(0,2,3,4,1)
+    return m.long()
+
+@lru_cache
+def global_position_index(D, H, W, fragments=(1,7,7), window_size=(8,7,7), shift_size=(0,0,0), device='cuda'):
+    frags_d = torch.arange(fragments[0])
+    frags_h = torch.arange(fragments[1])
+    frags_w = torch.arange(fragments[2])
+    frags = torch.stack(torch.meshgrid(frags_d, frags_h, frags_w)).float()  # 3, Fd, Fh, Fw
+    coords = torch.nn.functional.interpolate(frags[None].to(device), size=(D, H, W)).long().permute(0,2,3,4,1)
+    #print(shift_size)
+    coords = torch.roll(coords, shifts=(-shift_size[0], -shift_size[1], -shift_size[2]), dims=(1, 2, 3))
+    window_coords = window_partition(coords, window_size)
+    relative_coords = window_coords[:, None, :] - window_coords[:, :, None]  # Wd*Wh*Ww, Wd*Wh*Ww, 3
+    return relative_coords #relative_coords
+
 
 class Mlp(nn.Module):
     """ Multilayer perceptron."""
@@ -99,7 +113,7 @@ class WindowAttention3D(nn.Module):
         proj_drop (float, optional): Dropout ratio of output. Default: 0.0
     """
 
-    def __init__(self, dim, window_size, num_heads, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+    def __init__(self, dim, window_size, num_heads, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., frag_bias=False):
 
         super().__init__()
         self.dim = dim
@@ -111,6 +125,9 @@ class WindowAttention3D(nn.Module):
         # define a parameter table of relative position bias
         self.relative_position_bias_table = nn.Parameter(
             torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1) * (2 * window_size[2] - 1), num_heads))  # 2*Wd-1 * 2*Wh-1 * 2*Ww-1, nH
+        if frag_bias:
+            self.fragment_position_bias_table = nn.Parameter(
+            torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1) * (2 * window_size[2] - 1), num_heads))
 
         # get pair-wise relative position index for each token inside the window
         coords_d = torch.arange(self.window_size[0])
@@ -137,7 +154,7 @@ class WindowAttention3D(nn.Module):
         trunc_normal_(self.relative_position_bias_table, std=.02)
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, x, mask=None):
+    def forward(self, x, mask=None, fmask=None):
         """ Forward function.
         Args:
             x: input features with shape of (num_windows*B, N, C)
@@ -153,7 +170,29 @@ class WindowAttention3D(nn.Module):
         relative_position_bias = self.relative_position_bias_table[self.relative_position_index[:N, :N].reshape(-1)].reshape(
             N, N, -1)  # Wd*Wh*Ww,Wd*Wh*Ww,nH
         relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wd*Wh*Ww, Wd*Wh*Ww
-        attn = attn + relative_position_bias.unsqueeze(0) # B_, nH, N, N
+        if hasattr(self, 'fragment_position_bias_table'):
+            fragment_position_bias = self.fragment_position_bias_table[self.relative_position_index[:N, :N].reshape(-1)].reshape(
+            N, N, -1)  # Wd*Wh*Ww,Wd*Wh*Ww,nH
+            fragment_position_bias = fragment_position_bias.permute(2, 0, 1).contiguous()  # nH, Wd*Wh*Ww, Wd*Wh*Ww
+
+    
+        ### Mask Position Bias
+        if fmask is not None:
+            #fgate = torch.where(fmask - fmask.transpose(-1, -2) == 0, 1, 0).float()
+            fgate = fmask.abs().sum(-1)
+            nW = fmask.shape[0]
+            relative_position_bias = relative_position_bias.unsqueeze(0)
+            fgate = fgate.unsqueeze(1)
+            #print(fgate.shape, relative_position_bias.shape)
+            if hasattr(self, 'fragment_position_bias_table'):
+                relative_position_bias = relative_position_bias * fgate + fragment_position_bias * (1 - fgate)
+            
+            attn = attn.view(B_ // nW, nW, self.num_heads, N, N) + relative_position_bias.unsqueeze(0)
+            attn = attn.view(-1, self.num_heads, N, N)
+        else:
+            attn = attn + relative_position_bias.unsqueeze(0) # B_, nH, N, N
+        
+        
 
         if mask is not None:
             nW = mask.shape[0]
@@ -162,7 +201,6 @@ class WindowAttention3D(nn.Module):
             attn = self.softmax(attn)
         else:
             attn = self.softmax(attn)
-
         attn = self.attn_drop(attn)
 
         x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
@@ -191,7 +229,8 @@ class SwinTransformerBlock3D(nn.Module):
 
     def __init__(self, dim, num_heads, window_size=(2,7,7), shift_size=(0,0,0),
                  mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0., drop_path=0.,
-                 act_layer=nn.GELU, norm_layer=nn.LayerNorm, use_checkpoint=False, jump_attention=False):
+                 act_layer=nn.GELU, norm_layer=nn.LayerNorm, use_checkpoint=False, 
+                 jump_attention=False, frag_bias=False):
         super().__init__()
         self.dim = dim
         self.num_heads = num_heads
@@ -200,6 +239,7 @@ class SwinTransformerBlock3D(nn.Module):
         self.mlp_ratio = mlp_ratio
         self.use_checkpoint=use_checkpoint
         self.jump_attention=jump_attention
+        self.frag_bias=frag_bias
 
         assert 0 <= self.shift_size[0] < self.window_size[0], "shift_size must in 0-window_size"
         assert 0 <= self.shift_size[1] < self.window_size[1], "shift_size must in 0-window_size"
@@ -208,7 +248,7 @@ class SwinTransformerBlock3D(nn.Module):
         self.norm1 = norm_layer(dim)
         self.attn = WindowAttention3D(
             dim, window_size=self.window_size, num_heads=num_heads,
-            qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop)
+            qkv_bias=qkv_bias, qk_scale=qk_scale, attn_drop=attn_drop, proj_drop=drop, frag_bias=frag_bias)
 
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -225,19 +265,35 @@ class SwinTransformerBlock3D(nn.Module):
         pad_d1 = (window_size[0] - D % window_size[0]) % window_size[0]
         pad_b = (window_size[1] - H % window_size[1]) % window_size[1]
         pad_r = (window_size[2] - W % window_size[2]) % window_size[2]
+        
         x = F.pad(x, (0, 0, pad_l, pad_r, pad_t, pad_b, pad_d0, pad_d1))
         _, Dp, Hp, Wp, _ = x.shape
+        if False: #not hasattr(self, 'finfo_windows'):
+            finfo = fragment_infos(Dp, Hp, Wp)
+        
         # cyclic shift
         if any(i > 0 for i in shift_size):
             shifted_x = torch.roll(x, shifts=(-shift_size[0], -shift_size[1], -shift_size[2]), dims=(1, 2, 3))
+            if False: #not hasattr(self, 'finfo_windows'):
+                shifted_finfo = torch.roll(finfo, shifts=(-shift_size[0], -shift_size[1], -shift_size[2]), dims=(1, 2, 3))
             attn_mask = mask_matrix
         else:
             shifted_x = x
+            if False: #not hasattr(self, 'finfo_windows'):
+                shifted_finfo = finfo
             attn_mask = None
         # partition windows
         x_windows = window_partition(shifted_x, window_size)  # B*nW, Wd*Wh*Ww, C
+        if False: #not hasattr(self, 'finfo_windows'):
+            self.finfo_windows = window_partition(shifted_finfo, window_size) 
         # W-MSA/SW-MSA
-        attn_windows = self.attn(x_windows, mask=attn_mask)  # B*nW, Wd*Wh*Ww, C
+        #print(shift_size)
+        gpi = global_position_index(Dp, Hp, Wp, 
+                                    window_size=window_size, 
+                                    shift_size=shift_size, 
+                                    device=x.device)
+        attn_windows = self.attn(x_windows, mask=attn_mask, 
+                                 fmask=gpi) #self.finfo_windows)  # B*nW, Wd*Wh*Ww, C
         # merge windows
         attn_windows = attn_windows.view(-1, *(window_size+(C,)))
         shifted_x = window_reverse(attn_windows, window_size, B, Dp, Hp, Wp)  # B D' H' W' C
@@ -365,7 +421,8 @@ class BasicLayer(nn.Module):
                  norm_layer=nn.LayerNorm,
                  downsample=None,
                  use_checkpoint=False,
-                 jump_attention=False):
+                 jump_attention=False,
+                 frag_bias=False):
         super().__init__()
         self.window_size = window_size
         self.shift_size = tuple(i // 2 for i in window_size)
@@ -388,6 +445,7 @@ class BasicLayer(nn.Module):
                 norm_layer=norm_layer,
                 use_checkpoint=use_checkpoint,
                 jump_attention=jump_attention,
+                frag_bias=frag_bias,
             )
             for i in range(depth)])
         
@@ -504,8 +562,11 @@ class SwinTransformer3D(nn.Module):
                  patch_norm=True,
                  frozen_stages=-1,
                  use_checkpoint=True,
-                 jump_attention=[False, False, False, False]):
+                 jump_attention=[False, False, False, False],
+                 frag_biases=[True, True, True, False],
+                ):
         super().__init__()
+        print(frag_biases)
 
         self.pretrained = pretrained
         self.pretrained2d = pretrained2d
@@ -543,7 +604,8 @@ class SwinTransformer3D(nn.Module):
                 norm_layer=norm_layer,
                 downsample=PatchMerging if i_layer<self.num_layers-1 else None,
                 use_checkpoint=use_checkpoint,
-                jump_attention=jump_attention[i_layer])
+                jump_attention=jump_attention[i_layer],
+                frag_bias=frag_biases[i_layer])
             self.layers.append(layer)
 
         self.num_features = int(embed_dim * 2**(self.num_layers-1))
@@ -623,25 +685,30 @@ class SwinTransformer3D(nn.Module):
     def load_checkpoint(self, load_path, strict=False):
         from collections import OrderedDict
         model_state_dict = self.state_dict()
-        state_dict = torch.load(load_path)
-        if 'state_dict' in state_dict.keys():
-            state_dict = state_dict['state_dict']
+        state_dict = torch.load(load_path)['state_dict']
         
         clean_dict = OrderedDict()
         for key, value in state_dict.items():
             if 'backbone' in key:
                 clean_key = key[9:]
                 clean_dict[clean_key] = value
+                if 'relative_position_bias_table' in clean_key:
+                    forked_key = clean_key.replace('relative_position_bias_table', 'fragment_position_bias_table')
+                    if forked_key in clean_dict:
+                        print(f'Passing key {forked_key} as it is already in state_dict.')
+                    else:
+                        clean_dict[forked_key] = value
                 
-        if not strict:
-            for key, value in model_state_dict.items():
-                if key in clean_dict:
-                    if value.shape != clean_dict[key].shape:
-                        clean_dict.pop(key)
+        ## Only Support for 2X 
+        for key, value in model_state_dict.items():
+            if key in clean_dict:
+                if value.shape != clean_dict[key].shape:
+                    clean_dict.pop(key)
                     
         self.load_state_dict(clean_dict, strict=strict)
 
     def init_weights(self, pretrained=None):
+        print(self.pretrained, self.pretrained2d)
         """Initialize the weights in backbone.
 
         Args:
