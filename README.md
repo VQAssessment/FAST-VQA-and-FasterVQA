@@ -4,8 +4,11 @@ The official open source training and inference code for future paper 'FAST-VQA:
 
 ## Results
 
+We reach best performance on LSVQ-1080p test set while with much reduced FLOPs.
 
-See in [demos](./demos/) for more examples.
+![GFLOPs-performance](./demos/GFLOPs-performance.png)
+
+See in [demos](./demos/) for examples.
 
 ## Abstract
 
