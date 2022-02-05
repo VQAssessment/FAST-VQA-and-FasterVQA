@@ -96,7 +96,7 @@ def main():
     model = BaseEvaluator().to(device)
     if args.fsize != 32:
         raise NotImplementedError('Version 0.2.0 does not support fragment size other than 32.')
-    load_path = f'pretrained_weights/all_aligned_fragments_v0_2.pth'
+    load_path = f'pretrained_weights/fast_vqa_v0_3.pth'
     state_dict = torch.load(load_path, map_location='cpu')
 
     if 'state_dict' in state_dict:

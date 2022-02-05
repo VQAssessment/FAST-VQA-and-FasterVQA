@@ -12,7 +12,7 @@ random.seed(42)
 
 decord.bridge.set_bridge('torch')
 
-def get_fragments(video, fragments=7, fsize=32, aligned=32, random=True):
+def get_fragments(video, fragments=7, fsize=32, aligned=32, random=False):
     size = fragments * fsize
     if min(video.shape[-2:]) < size:
         ovideo = video
@@ -27,6 +27,15 @@ def get_fragments(video, fragments=7, fsize=32, aligned=32, random=True):
     hlength, wlength = res_h // fragments, res_w // fragments
     
     if random:
+        if res_h > fsize:
+            rnd_h = torch.randint(res_h - fsize, (len(hgrids), len(wgrids), dur_t // aligned))
+        else:
+            rnd_h = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
+        if res_w > fsize:
+            rnd_w = torch.randint(res_w - fsize, (len(hgrids), len(wgrids), dur_t // aligned))
+        else:
+            rnd_w = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
+    else:
         if hlength > fsize:
             rnd_h = torch.randint(hlength - fsize, (len(hgrids), len(wgrids), dur_t // aligned))
         else:
@@ -35,15 +44,6 @@ def get_fragments(video, fragments=7, fsize=32, aligned=32, random=True):
             rnd_w = torch.randint(wlength - fsize, (len(hgrids), len(wgrids), dur_t // aligned))
         else:
             rnd_w = torch.zeros((len(hgrids), len(wgrids), dur_t // aligned)).int()
-    else:
-        if hlength > fsize:
-            dtm_h = (hlength - fsize) // 2
-        else:
-            dtm_h = 0
-        if wlength > fsize:
-            dtm_w = (wlength - fsize) // 2
-        else:
-            dtm_w = 0
     
     target_video = torch.zeros(video.shape[:-2] + size).to(video.device)
     #target_videos = []
@@ -55,11 +55,11 @@ def get_fragments(video, fragments=7, fsize=32, aligned=32, random=True):
                 h_s, h_e = i * fsize, (i+1) * fsize
                 w_s, w_e = j * fsize, (j+1) * fsize
                 if random:
+                    h_so, h_eo = rnd_h[i][j][t], rnd_h[i][j][t] + fsize
+                    w_so, w_eo = rnd_w[i][j][t], rnd_w[i][j][t] + fsize
+                else:
                     h_so, h_eo = hs + rnd_h[i][j][t], hs + rnd_h[i][j][t] + fsize
                     w_so, w_eo = ws + rnd_w[i][j][t], ws + rnd_w[i][j][t] + fsize
-                else:
-                    h_so, h_eo = hs + dtm_h, hs + dtm_h + fsize
-                    w_so, w_eo = ws + dtm_w, ws + dtm_w + fsize
                 target_video[:,t_s:t_e,h_s:h_e,w_s:w_e] = video[:,t_s:t_e,h_so:h_eo,w_so:w_eo]
     #target_videos.append(video[:,t_s:t_e,h_so:h_eo,w_so:w_eo])
     #target_video = torch.stack(target_videos, 0).reshape((dur_t // aligned, fragments, fragments,) + target_videos[0].shape).permute(3,0,4,1,5,2,6)
@@ -159,6 +159,7 @@ class VQAInferenceDataset(torch.utils.data.Dataset):
         self.fragments = fragments
         self.fsize = fsize
         self.nfrags = nfrags
+        self.aligned = aligned
         self.sampler = SampleFrames(clip_len, frame_interval, num_clips)
         self.video_infos = []
         self.phase = phase
@@ -197,22 +198,24 @@ class VQAInferenceDataset(torch.utils.data.Dataset):
                 for idx in np.unique(frame_inds)
             }
             imgs = [frame_dict[idx] for idx in frame_inds]
+            img_shape = imgs[0].shape
             video = torch.stack(imgs, 0)
             video = video.permute(3, 0, 1, 2)
             if self.nfrags == 1:
-                vfrag = get_fragments(video, fragments, fsize)
+                vfrag = get_fragments(video, fragments, fsize, aligned=self.aligned)
             else: 
-                vfrag = get_fragments(video, fragments, fsize)
+                vfrag = get_fragments(video, fragments, fsize, aligned=self.aligned)
                 for i in range(1, self.nfrags):
-                    vfrag = torch.cat((vfrag, get_fragments(video, fragments, fsize)), 1)
+                    vfrag = torch.cat((vfrag, get_fragments(video, fragments, fsize, aligned=self.aligned)), 1)
             if tocache:
-                return (vfrag, frame_inds, label)
+                return (vfrag, frame_inds, label, img_shape)
         else:
-            vfrag, frame_inds, label = self.cache[index]
+            vfrag, frame_inds, label, img_shape = self.cache[index]
         vfrag = ((vfrag.permute(1, 2, 3, 0) - self.mean) / self.std).permute(3,0,1,2)
         return {'video': vfrag.reshape((-1, self.nfrags * self.num_clips, self.clip_len) + vfrag.shape[2:]).transpose(0,1), ## B, V, T, C, H, W
                 'frame_inds': frame_inds,
                 'gt_label': label,
+                'original_shape': img_shape,
                }
 
     def __len__(self):

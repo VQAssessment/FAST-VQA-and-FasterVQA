@@ -191,7 +191,7 @@ def main():
         else:
             if args.fsize != 32:
                 raise NotImplementedError('Version 0.2.0 only supports 32*32 finetune on fragments.')
-            load_path = f'pretrained_weights/all_aligned_fragments_v0_2.pth'
+            load_path = f'pretrained_weights/fast_vqa_v0_3.pth'
         state_dict = torch.load(load_path, map_location='cpu')
 
         if 'state_dict' in state_dict:
@@ -243,7 +243,7 @@ def main():
         del model
         
         
-    torch.save({'results': bests_}, f'{args.save_dir}/results_finetune_{args.dataset.lower()}_s{args.fsize}*{args.fsize}_ens{args.famount}{"" if not args.from_ar else "from_ar"}.pkl')
+    torch.save({'results': bests_}, f'{args.save_dir}/results_finetune_{args.dataset.lower()}_s{args.fsize}*{args.fsize}_ens{args.famount}{"" if not args.from_ar else "_from_ar"}.pkl')
     
 
 if __name__ == '__main__':

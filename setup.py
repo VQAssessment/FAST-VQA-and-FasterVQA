@@ -24,7 +24,7 @@ def get_requirements(filename='requirements.txt'):
 setup(
         name='fastvqa',
         version=get_version(),
-        description='End-to-End VQA Toolbox',
+        description='Very Efficient End-to-End VQA Toolbox',
         long_description=readme(),
         long_description_content_type='text/markdown',
         author='Timothy H. Wu',
