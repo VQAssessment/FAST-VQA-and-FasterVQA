@@ -12,7 +12,7 @@ We reach SOTA performance with 210x reduced FLOPs.
 
 Our sparse and efficient sub-sampling also reaches at least 99.5% relative accuracy than extreme dense sampling.
 
-![IOS](./demos/impact_on_subsample.pdf)
+![IOS](./demos/impact_on_subsample.png)
 
 See in [demos](./demos/) for examples on local quality maps.
 
