@@ -1,6 +1,7 @@
 import torch
 import cv2
 import random
+import os.path as osp
 from fastvqa.models import BaseEvaluator
 from fastvqa.datasets import VQAInferenceDataset, get_fragments
 
@@ -21,7 +22,19 @@ def rescale(pr, gt=None):
         pr = ((pr - np.mean(pr)) / np.std(pr)) * np.std(gt) + np.mean(gt)
     return pr
 
-all_datasets = ['LIVE_VQC', 'KoNViD', 'CVD2014', 'LSVQ']
+all_datasets = ['LIVE_VQC', 'KoNViD', 'CVD2014', 'LSVQ', 'YouTubeUGC']
+
+
+def deterministic_split(dataset_path, ann_file, start=0, end=-1):
+    video_infos = []
+    with open(ann_file, 'r') as fin:
+        for line in fin:
+            line_split = line.strip().split(',')
+            filename, _, _, label = line_split
+            label = float(label)
+            filename = osp.join(dataset_path, filename)
+            video_infos.append(dict(filename=filename, label=label))
+    return video_infos[start:end]
 
 def predict_dataset(args, dataset, model, device):
     
@@ -29,14 +42,29 @@ def predict_dataset(args, dataset, model, device):
     
     ## getting datasets (if you want to load from existing VQA datasets)
     dataset_name = dataset
-    dataset_path = f'{args.pdpath}/{dataset_name}'
+    if ',' in dataset_name:
+        dataset_name, start, end = dataset_name.split(',')
+        assert dataset_name in all_datasets
+        dataset_path = f'{args.pdpath}/{dataset_name}'
 
-    inference_set = VQAInferenceDataset(f'examplar_data_labels/{dataset_name}/labels.txt',
-                                        dataset_path,
-                                        fsize = args.fsize, 
-                                        fragments = 224 // args.fsize, 
-                                        nfrags = args.famount,
-                                        cache_in_memory = args.cache)
+        test_infos = deterministic_split(dataset_path, f'examplar_data_labels/{dataset_name}/labels.txt', int(start), int(end))
+
+        inference_set = VQAInferenceDataset(test_infos,
+                                            dataset_path,
+                                            fsize = args.fsize, 
+                                            fragments = 224 // args.fsize, 
+                                            nfrags = args.famount,
+                                            cache_in_memory = args.cache,
+                                            )
+    else:
+        dataset_path = f'{args.pdpath}/{dataset_name}'
+        inference_set = VQAInferenceDataset(f'examplar_data_labels/{dataset_name}/labels.txt',
+                                            dataset_path,
+                                            fsize = args.fsize, 
+                                            fragments = 224 // args.fsize, 
+                                            nfrags = args.famount,
+                                            cache_in_memory = args.cache,
+                                            )
     
     print(f'Inference on Dataset {args.dataset} in {dataset_path}')
 
@@ -45,12 +73,32 @@ def predict_dataset(args, dataset, model, device):
 
     inference_loader = torch.utils.data.DataLoader(inference_set, batch_size=1, num_workers=6)
     results = []
+    
+    
+    # avoid GPU out of memory, this is set for Tesla V100, please scale based on your GPU
+    max_testing_views = 24
 
     for i, data in enumerate(tqdm(inference_loader)):
         result = dict()
         vfrag = data['video'].to(device).squeeze(0)
+        
         with torch.no_grad():
-            result['pr_labels'] = model(vfrag).cpu().numpy()
+            if vfrag.shape[0] > max_testing_views:
+                res_collections = []
+                
+                for i in range(vfrag.shape[0] // max_testing_views):
+                    if args.reduction:
+                        res_ = model(vfrag[i*max_testing_views:(i+1)*max_testing_views]).reshape(max_testing_views//4, -1).mean(1)
+                    else:
+                        res_ = model(vfrag[i*max_testing_views:(i+1)*max_testing_views])
+                    res_collections.append(res_)
+                result['pr_labels'] = torch.cat(res_collections, 0).cpu().numpy()
+                
+            else:
+                if args.reduction:
+                    result['pr_labels'] = model(vfrag).reshape(args.famount, -1).mean(1).cpu().numpy()
+                else:
+                    result['pr_labels'] = model(vfrag).cpu().numpy()
         result['gt_label'] = data['gt_label'].item()
         result['frame_inds'] = data['frame_inds']
         del data
@@ -74,12 +122,14 @@ def predict_dataset(args, dataset, model, device):
 def main():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--dataset', choices=['LIVE_VQC', 'LSVQ', 'KoNViD', 'CVD2014', 'all'], default='LIVE_VQC', help='the inference dataset name')
-    parser.add_argument('--pdpath', type=str, default='../datasets/', help='the inference dataset name')
+    parser.add_argument('-d', '--dataset', type=str, default='LIVE_VQC', help='the inference dataset name, can add XXX,a,b to evaluate XXX from [')
+    parser.add_argument('--pdpath', type=str, default='../datasets/', help='the inference dataset path')
     parser.add_argument('-s', '--fsize', choices=[8, 16, 32], default=32, help='size of fragment strips')
     parser.add_argument('-a', '--famount', type=int, default=1, help='sample amount of fragment strips')
     parser.add_argument('--save_dir', type=str, default='results', help='results_dir')
-    parser.add_argument('--cache', action='store_true', help='use_cache_dataset')
+    parser.add_argument('-c', '--cache', action='store_true', help='use_cache_dataset')
+    parser.add_argument('-r', '--reduction', action='store_true', help='reduce_local_quality_maps')
+
     
     args = parser.parse_args()
 
@@ -95,7 +145,7 @@ def main():
 
     model = BaseEvaluator().to(device)
     if args.fsize != 32:
-        raise NotImplementedError('Version 0.2.0 does not support fragment size other than 32.')
+        raise NotImplementedError('Version 0.2.0 and above does not support fragment size other than 32.')
     load_path = f'pretrained_weights/fast_vqa_v0_3.pth'
     state_dict = torch.load(load_path, map_location='cpu')
 

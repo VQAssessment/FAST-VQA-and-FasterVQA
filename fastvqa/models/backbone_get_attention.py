@@ -202,12 +202,16 @@ class WindowAttention3D(nn.Module):
             attn = self.softmax(attn)
         attn = self.attn_drop(attn)
         
+        if B_ < 16:
+            avg_attn = (attn.mean((1,2)).detach(), attn.mean((1,3)).detach())
+        else:
+            avg_attn = None
 
         x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
         
-        return x
+        return x, avg_attn
 
 
 class SwinTransformerBlock3D(nn.Module):
@@ -293,7 +297,7 @@ class SwinTransformerBlock3D(nn.Module):
                                     window_size=window_size, 
                                     shift_size=shift_size, 
                                     device=x.device)
-        attn_windows = self.attn(x_windows, mask=attn_mask, 
+        attn_windows, avg_attn = self.attn(x_windows, mask=attn_mask, 
                                  fmask=gpi) #self.finfo_windows)  # B*nW, Wd*Wh*Ww, C
         # merge windows
         attn_windows = attn_windows.view(-1, *(window_size+(C,)))
@@ -306,7 +310,7 @@ class SwinTransformerBlock3D(nn.Module):
 
         if pad_d1 >0 or pad_r > 0 or pad_b > 0:
             x = x[:, :D, :H, :W, :].contiguous()
-        return x
+        return x, avg_attn
 
     def forward_part2(self, x):
         return self.drop_path(self.mlp(self.norm2(x)))
@@ -324,7 +328,7 @@ class SwinTransformerBlock3D(nn.Module):
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(self.forward_part1, x, mask_matrix)
             else:
-                x = self.forward_part1(x, mask_matrix)
+                x, avg_attn = self.forward_part1(x, mask_matrix)
             x = shortcut + self.drop_path(x)
 
         if self.use_checkpoint:
@@ -332,7 +336,7 @@ class SwinTransformerBlock3D(nn.Module):
         else:
             x = x + self.forward_part2(x)
 
-        return x
+        return x, avg_attn
 
 
 class PatchMerging(nn.Module):
@@ -468,14 +472,17 @@ class BasicLayer(nn.Module):
         Hp = int(np.ceil(H / window_size[1])) * window_size[1]
         Wp = int(np.ceil(W / window_size[2])) * window_size[2]
         attn_mask = compute_mask(Dp, Hp, Wp, window_size, shift_size, x.device)
+        avg_attns = []
         for blk in self.blocks:
-            x = blk(x, attn_mask)
+            x, avg_attn = blk(x, attn_mask)
+            if avg_attn is not None:
+                avg_attns.append(avg_attn)
         x = x.view(B, D, H, W, -1)
 
         if self.downsample is not None:
             x = self.downsample(x)
         x = rearrange(x, 'b d h w c -> b c d h w')
-        return x
+        return x, avg_attns
 
 
 class PatchEmbed3D(nn.Module):
@@ -744,8 +751,6 @@ class SwinTransformer3D(nn.Module):
             raise TypeError('pretrained must be a str or None')
 
     def forward(self, x, multi=False, require_attn=False):
-        if require_attn:
-            raise NotImplementedError
         """Forward function."""
         x = self.patch_embed(x)
 
@@ -756,7 +761,7 @@ class SwinTransformer3D(nn.Module):
             feats = [x]
 
         for layer in self.layers:
-            x = layer(x.contiguous())
+            x, avg_attns = layer(x.contiguous())
             if multi:
                 feats += [x]
 
@@ -769,7 +774,10 @@ class SwinTransformer3D(nn.Module):
         else:
             x = x
         
-        return x
+        if require_attn:
+            return x, avg_attns
+        else:
+            return x
 
     def train(self, mode=True):
         """Convert the model into training mode while keep layers freezed."""

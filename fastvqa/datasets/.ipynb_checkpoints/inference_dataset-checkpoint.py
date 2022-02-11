@@ -182,7 +182,7 @@ class VQAInferenceDataset(torch.utils.data.Dataset):
         else:
             self.cache = None
                 
-    def __getitem__(self, index, fragments=-1, fsize=-1, tocache=False):
+    def __getitem__(self, index, fragments=-1, fsize=-1, tocache=False, need_original_frames=False):
         if tocache or self.cache is None:
             if fragments == -1:
                 fragments = self.fragments
@@ -212,11 +212,13 @@ class VQAInferenceDataset(torch.utils.data.Dataset):
         else:
             vfrag, frame_inds, label, img_shape = self.cache[index]
         vfrag = ((vfrag.permute(1, 2, 3, 0) - self.mean) / self.std).permute(3,0,1,2)
-        return {'video': vfrag.reshape((-1, self.nfrags * self.num_clips, self.clip_len) + vfrag.shape[2:]).transpose(0,1), ## B, V, T, C, H, W
+        data =  {'video': vfrag.reshape((-1, self.nfrags * self.num_clips, self.clip_len) + vfrag.shape[2:]).transpose(0,1), ## B, V, T, C, H, W
                 'frame_inds': frame_inds,
                 'gt_label': label,
                 'original_shape': img_shape,
                }
-
+        if need_original_frames:
+            data['original_video'] = video.reshape((-1, self.nfrags * self.num_clips, self.clip_len) + video.shape[2:]).transpose(0,1)
+        return data
     def __len__(self):
         return len(self.video_infos)

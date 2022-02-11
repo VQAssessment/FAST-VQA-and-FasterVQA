@@ -1,4 +1,4 @@
-__version__ = '0.3.0-submission-edition'
+__version__ = '0.4.0-support-training'
 
 def parse_version_info(version_str):
     version_info = []

@@ -45,5 +45,11 @@ class BaseEvaluator(nn.Module):
             score = self.vqa_head(feat)
             return score
                 
+    def forward_with_attention(self, vclip):
+        self.eval()
+        with torch.no_grad():
+            feat, avg_attns = self.backbone(vclip, require_attn=True)
+            score = self.vqa_head(feat)
+            return score, avg_attns
         
             

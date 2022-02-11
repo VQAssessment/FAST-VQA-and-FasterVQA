@@ -192,7 +192,6 @@ class WindowAttention3D(nn.Module):
         else:
             attn = attn + relative_position_bias.unsqueeze(0) # B_, nH, N, N
         
-        
 
         if mask is not None:
             nW = mask.shape[0]
@@ -202,10 +201,12 @@ class WindowAttention3D(nn.Module):
         else:
             attn = self.softmax(attn)
         attn = self.attn_drop(attn)
+        
 
         x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
+        
         return x
 
 
@@ -742,7 +743,9 @@ class SwinTransformer3D(nn.Module):
         else:
             raise TypeError('pretrained must be a str or None')
 
-    def forward(self, x, multi=False):
+    def forward(self, x, multi=False, require_attn=False):
+        if require_attn:
+            raise NotImplementedError
         """Forward function."""
         x = self.patch_embed(x)
 
@@ -762,9 +765,11 @@ class SwinTransformer3D(nn.Module):
         x = rearrange(x, 'n d h w c -> n c d h w')
 
         if multi:
-            return feats[:-1] + [x]
+            x = feats[:-1] + [x]
         else:
-            return x
+            x = x
+        
+        return x
 
     def train(self, mode=True):
         """Convert the model into training mode while keep layers freezed."""

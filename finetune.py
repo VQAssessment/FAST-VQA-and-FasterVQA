@@ -51,51 +51,69 @@ def rescale(pr, gt=None):
         pr = ((pr - np.mean(pr)) / np.std(pr)) * np.std(gt) + np.mean(gt)
     return pr
 
-all_datasets = ['LIVE_VQC', 'KoNViD', 'CVD2014']
+all_datasets = ['LIVE_VQC', 'KoNViD', 'CVD2014', 'YouTubeUGC']
 
-def generate_dataset(args, dataset, seed=42):
+def generate_dataset(args, dataset, seed=42, dataset_hp=dict()):
     
-    print(f'Predicting video quality on dataset: {dataset}.')
-    
-    ## getting datasets (if you want to load from existing VQA datasets)
-    dataset_name = dataset
-    dataset_path = f'{args.pdpath}/{dataset_name}'
-    
-    train_infos, val_infos = train_test_split(dataset_path, f'examplar_data_labels/{dataset_name}/labels.txt', seed=seed)
+    if '-' in dataset:
+        finetune_dataset_name = dataset.split('-')[0]
+        if finetune_dataset_name == 'LSVQ':
+            train_infos = f'examplar_data_labels/train_labels.txt'
+        else:
+            train_infos = f'examplar_data_labels/{finetune_dataset_name}/labels.txt'
+        train_dataset_path = f'{args.pdpath}/{finetune_dataset_name}'
+        val_dataset_name = dataset.split('-')[1]
+        val_dataset_path = f'{args.pdpath}/{val_dataset_name}'
+        val_infos = f'examplar_data_labels/{val_dataset_name}/labels.txt'
+        finetune_set = VQAInferenceDataset(train_infos,
+                                            train_dataset_path,
+                                            num_clips = 1,
+                                            phase='train',
+                                            **dataset_hp,
+                                           )
 
-    finetune_set = VQAInferenceDataset(train_infos,
-                                        dataset_path,
-                                        num_clips = 1,
-                                        fsize = args.fsize, 
-                                        fragments = 224 // args.fsize, 
-                                        nfrags = args.famount,
-                                        cache_in_memory = args.cache,
-                                        phase='train',
-                                       )
-    
-    validation_set = VQAInferenceDataset(val_infos,
-                                        dataset_path,
-                                        num_clips = 4,
-                                        fsize = args.fsize, 
-                                        fragments = 224 // args.fsize, 
-                                        nfrags = args.famount,
-                                        cache_in_memory = args.cache,
-                                       )
-    
-    
-    print(f'Fine-tuning on Dataset {args.dataset} in {dataset_path}.')
+        validation_set = VQAInferenceDataset(val_infos,
+                                            val_dataset_path,
+                                            num_clips = 4,
+                                            **dataset_hp,
+                                           )
+        
+    else:
+        print(f'Predicting video quality on dataset: {dataset}.')
+
+        ## getting datasets (if you want to load from existing VQA datasets)
+        dataset_name = dataset
+        dataset_path = f'{args.pdpath}/{dataset_name}'
+
+        train_infos, val_infos = train_test_split(dataset_path, f'examplar_data_labels/{dataset_name}/labels.txt', seed=seed)
+
+        finetune_set = VQAInferenceDataset(train_infos,
+                                            dataset_path,
+                                            num_clips = 1,
+                                            phase='train',
+                                            **dataset_hp,
+                                           )
+
+        validation_set = VQAInferenceDataset(val_infos,
+                                            dataset_path,
+                                            num_clips = 4,
+                                            **dataset_hp,
+                                           )
+
+
+        print(f'Fine-tuning on Dataset {args.dataset} in {dataset_path}, with hyper-parameters {dataset_hp}.')
     
     return finetune_set, validation_set
 
-def generate_train_test_loader(args, seed=42):
+def generate_train_test_loader(args, seed=42, dataset_hp=dict()):
    
     dataset = args.dataset
     
-    ft_set, val_set = generate_dataset(args, dataset, seed=seed)
+    ft_set, val_set = generate_dataset(args, dataset, seed=seed, dataset_hp=dataset_hp)
     
     print(len(ft_set), len(val_set))
     
-    ft_loader = torch.utils.data.DataLoader(ft_set, batch_size=8, num_workers=6, shuffle=True)
+    ft_loader = torch.utils.data.DataLoader(ft_set, batch_size=args.bs, num_workers=6, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_set, batch_size=1, num_workers=6, pin_memory=True)
     
     return ft_loader, val_loader
@@ -154,10 +172,12 @@ def inference_set(inf_loader, model, device, best_):
 def main():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--dataset', choices=['LIVE_VQC', 'KoNViD', 'CVD2014'], default='LIVE_VQC', help='the finetune dataset name')
+    parser.add_argument('-d', '--dataset', choices=['LIVE_VQC', 'KoNViD', 'CVD2014', 'YouTubeUGC', 'LSVQ-LIVE_VQC', 'LSVQ-KoNViD'], default='LIVE_VQC', help='the finetune dataset name')
     parser.add_argument('--pdpath', type=str, default='../datasets/', help='the inference dataset name')
     parser.add_argument('-s', '--fsize', choices=[8, 16, 32], default=32, help='size of fragment strips')
+    parser.add_argument('-b', '--bs', type=int, default=8, help='batchsize')
     parser.add_argument('-a', '--famount', type=int, default=1, help='sample amount of fragment strips')
+    parser.add_argument('-m', '--model_type', type=str, default='fast', help='choose whether to use FAST-VQA or the FASTER-VQA')
     parser.add_argument('-lep', '--l_num_epochs', type=int, default=10, help='linear finetune epochs')
     parser.add_argument('-ep', '--num_epochs', type=int, default=20, help='finetune epochs')
     parser.add_argument('--save_dir', type=str, default='results', help='results_dir')
@@ -181,18 +201,41 @@ def main():
     
     bests_ = []
     
-    torch.save({'results': bests_}, f'{args.save_dir}/results_finetune_{args.dataset.lower()}_s{args.fsize}*{args.fsize}_ens{args.famount}{"" if not args.from_ar else "_from_ar"}.pkl')
+    torch.save({'results': bests_}, f'{args.save_dir}/results_{args.model_type}_finetune_{args.dataset.lower()}_s{args.fsize}*{args.fsize}_ens{args.famount}{"" if not args.from_ar else "_from_ar"}.pkl')
+    
+    if args.model_type == 'fast':
+        ## Hyper Parameters for FAST-VQA fine-tune
+        dataset_hp = dict(fragments=7,
+                          fsize=args.fsize, 
+                          nfrags=args.famount,
+                          cache_in_memory=False,
+                          clip_len=32,
+                          aligned=32)
+        backbone_hp = dict(window_size=(8,7,7),
+                           frag_biases=[True,True,True,False])
+    else:
+        # Hyper Parameters for FASTER-VQA fine-tune
+        dataset_hp = dict(fragments=4,
+                          fsize=args.fsize, 
+                          nfrags=args.famount,
+                          cache_in_memory=args.cache,
+                          clip_len=16,
+                          aligned=8)
+        backbone_hp = dict(window_size=(4,4,4),
+                           frag_biases=[False,False,True,False])
+        
+        
     
     for i in range(10):
-        model = BaseEvaluator().to(device)
+        model = BaseEvaluator(backbone_hp).to(device)
 
         if args.from_ar:
             load_path = '../model_baselines/NetArch/swin_tiny_patch244_window877_kinetics400_1k.pth'
         else:
             if args.fsize != 32:
-                raise NotImplementedError('Version 0.2.0 only supports 32*32 finetune on fragments.')
-            load_path = f'pretrained_weights/fast_vqa_v0_3.pth'
-        state_dict = torch.load(load_path, map_location='cpu')
+                raise NotImplementedError('Version 0.3.0 only supports 32*32 finetune on fragments.')
+            load_path = f'pretrained_weights/{args.model_type}_vqa_v0_3.pth'
+        state_dict = torch.load(load_path, map_location=device)
 
         if 'state_dict' in state_dict:
             state_dict = state_dict['state_dict']
@@ -205,10 +248,14 @@ def main():
                         i_state_dict[tkey] = state_dict[key]
                 else:
                     i_state_dict[key] = state_dict[key]
-
+                    
+        t_state_dict = model.state_dict()
+        for key, value in t_state_dict.items():
+            if key in i_state_dict and i_state_dict[key].shape != value.shape:
+                i_state_dict.pop(key)
         model.load_state_dict(i_state_dict, strict=False)
 
-        ft_loader, val_loader = generate_train_test_loader(args, seed=42*(i+1))
+        ft_loader, val_loader = generate_train_test_loader(args, seed=42*(i+1), dataset_hp=dataset_hp)
 
         ## finetune the model
         print(len(ft_loader), len(val_loader))
@@ -243,7 +290,7 @@ def main():
         del model
         
         
-    torch.save({'results': bests_}, f'{args.save_dir}/results_finetune_{args.dataset.lower()}_s{args.fsize}*{args.fsize}_ens{args.famount}{"" if not args.from_ar else "_from_ar"}.pkl')
+    torch.save({'results': bests_}, f'{args.save_dir}/results_{args.model_type}_finetune_{args.dataset.lower()}_s{args.fsize}*{args.fsize}_ens{args.famount}{"" if not args.from_ar else "_from_ar"}.pkl')
     
 
 if __name__ == '__main__':
