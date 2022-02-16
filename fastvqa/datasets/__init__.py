@@ -1,3 +1,13 @@
-from .inference_dataset import VQAInferenceDataset, get_fragments, SampleFrames
+from .inference_dataset import (
+    VQAInferenceDataset,
+    IQAInferenceDataset,
+    get_fragments,
+    SampleFrames,
+)
 
-__all__ = ['VQAInferenceDataset', 'get_fragments', 'SampleFrames']
+__all__ = [
+    "VQAInferenceDataset",
+    "IQAInferenceDataset",
+    "get_fragments",
+    "SampleFrames",
+]

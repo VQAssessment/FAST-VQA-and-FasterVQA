@@ -8,15 +8,16 @@ from .head import VQAHead
 
 
 class BaseEvaluator(nn.Module):
-    def __init__(self,
-                 backbone=dict(),
-                 vqa_head=dict(),
-                 teacher=None,
-                 multi=False,
-                 backbone_f=None,
-                 vqa_head_f=dict(),
-                 vqa_head_w=dict(in_channels=1536),
-                ):
+    def __init__(
+        self,
+        backbone=dict(),
+        vqa_head=dict(),
+        teacher=None,
+        multi=False,
+        backbone_f=None,
+        vqa_head_f=dict(),
+        vqa_head_w=dict(in_channels=1536),
+    ):
         super().__init__()
         self.backbone = Backbone(**backbone)
         self.vqa_head = VQAHead(**vqa_head)
@@ -25,7 +26,7 @@ class BaseEvaluator(nn.Module):
             self.backbone_f = Backbone(**backbone_f)
             self.vqa_head_f = VQAHead(**vqa_head_f)
             self.vqa_head_w = VQAHead(**vqa_head_w)
-                
+
     def forward(self, vclip, fvclip=None, inference=True, **kwargs):
         if inference:
             self.eval()
@@ -44,12 +45,10 @@ class BaseEvaluator(nn.Module):
             feat = self.backbone(vclip)
             score = self.vqa_head(feat)
             return score
-                
+
     def forward_with_attention(self, vclip):
         self.eval()
         with torch.no_grad():
             feat, avg_attns = self.backbone(vclip, require_attn=True)
             score = self.vqa_head(feat)
             return score, avg_attns
-        
-            
