@@ -1,12 +1,21 @@
 # FAST-VQA
 
-The official open source training and inference code for future paper 'FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sub-sampling'.
+Version: 0.6.0
 
-[Link on Preprint Edition of Paper](NA).
+The official open source training and inference code for future paper 'FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling'[Arxiv Edition](NA).
 
-## Results 
+Fragments:
+![1](demo_fragments_with_originals_lsvq/9674_55.21_torch.Size([1080, 1920, 3])/fr_0.jpg)
 
-We reach SOTA performance with 210x reduced FLOPs.
+Original Frames:
+![2](demo_fragments_with_originals_lsvq/9674_55.21_torch.Size([1080, 1920, 3])/vr_0.jpg)
+
+You can also view the live fragment videos in [fragment demos](demo_fragments_with_originals_lsvq/9674_55.21_torch.Size([1080, 1920, 3])).
+
+
+## Results
+
+We reach SOTA performance with 210x reduced FLOPs. We also refresh the SOTA on multiple databases by a very large margin.
 
 ![GFLOPs-performance](./demos/GFLOPs-performance.png)
 
@@ -14,7 +23,7 @@ Our sparse and efficient sub-sampling also reaches at least 99.5% relative accur
 
 ![IOS](./demos/impact_on_subsample.png)
 
-See in [demos](./demos/) for examples on local quality maps.
+See in [quality map demos](./demos/) for examples on local quality maps.
 
 
 ## Build FAST-VQA
@@ -24,8 +33,8 @@ See in [demos](./demos/) for examples on local quality maps.
 The original method is build with
 
 - python=3.8.8
-- torch=1.8.1
-- torchvision=0.9.1
+- torch=1.10.2
+- torchvision=0.11.3
 
 while using decord module to read original videos (so that you don't need to make any transform on your original .mp4 input).
 
@@ -44,6 +53,17 @@ pip install .
 to build the full FAST-VQA.
 
 ## Test FAST-VQA
+
+### Visualize *fragments*
+
+If you would like to visualize the proposed *fragments*, you can generate the demo visualizations by yourself, via the following script:
+
+
+```shell
+python visualize.py -d $DATASET$ 
+```
+
+
 
 ### Inference on Scripts
 
