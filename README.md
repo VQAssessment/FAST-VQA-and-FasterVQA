@@ -2,22 +2,14 @@
 
 Version: 0.6.0
 
-The official open source training and inference code for future paper 'FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling'[Arxiv Edition](NA).
-
-Fragments:
-![1](./demo_fragments_with_originals_lsvq/9674_55.21_torch.Size\(\[1080, 1920, 3\]\)/fr_0.jpg)
-
-Original Frames:
-![2](./demo_fragments_with_originals_lsvq/9674_55.21_torch.Size\(\[1080, 1920, 3\]\)/vr_0.jpg)
-
-You can also view the live fragment videos in [fragment demos](demo_fragments_with_originals_lsvq/9674_55.21_torch.Size\(\[1080, 1920, 3\]\)).
+The official open source training and inference code for future paper 'FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling'\[[Arxiv Edition](NA)\].
 
 
 ## Results
 
 We reach SOTA performance with 210x reduced FLOPs. We also refresh the SOTA on multiple databases by a very large margin.
 
-![GFLOPs-performance](./demos/GFLOPs-performance.png)
+![GFLOPs-performance](./demos/Results.png)
 
 Our sparse and efficient sub-sampling also reaches at least 99.5% relative accuracy than extreme dense sampling.
 
