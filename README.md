@@ -1,15 +1,15 @@
 # FAST-VQA
 
-Version: 0.6.0
+*Version: 0.6.1*
 
 The official open source training and inference code for our paper "FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling". \[[Arxiv Edition](NA)\].
 
 Live Fragments:
 
-![Frag](./demo_fragments_with_originals/238_38.24_720p/fr_0.jpg)
+![Frag](./demos/fr1.gif)
 (From LIVE-VQC, 720p, Original Score **38.24**)
 
-![Frag](./demo_fragments_with_originals/25_74.54_1080p/fr_0.jpg)
+![Frag](./demos/fr2.gif)
 (From LIVE-VQC, 1080p, Original Score **74.54**)
 
 
