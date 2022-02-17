@@ -6,13 +6,13 @@ The official open source training and inference code for future paper 'FAST-VQA:
 
 Fragment:
 
-![Frag](./demo_fragments_with_originals/238_38.24_720p/fr0.jpg)
-![Frag](./demo_fragments_with_originals/25_74.54_1080p/fr0.jpg)
+![Frag](./demo_fragments_with_originals/238_38.24_720p/fr_0.jpg)
+![Frag](./demo_fragments_with_originals/25_74.54_1080p/fr_0.jpg)
 
 Original Frame:
 
-![Video](./demo_fragments_with_originals/238_38.24_720p/vr0.jpg)
-![Video](./demo_fragments_with_originals/25_74.54_1080p/vr0.jpg)
+![Video](./demo_fragments_with_originals/238_38.24_720p/vr_0.jpg)
+![Video](./demo_fragments_with_originals/25_74.54_1080p/vr_0.jpg)
 
 See [demo_fragments_with_originals](./demo_fragments_with_originals) for live fragments.
 
