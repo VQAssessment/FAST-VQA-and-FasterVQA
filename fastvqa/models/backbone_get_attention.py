@@ -50,7 +50,7 @@ def global_position_index(
 
 
 class Mlp(nn.Module):
-    """ Multilayer perceptron."""
+    """Multilayer perceptron."""
 
     def __init__(
         self,
@@ -147,7 +147,7 @@ def get_window_size(x_size, window_size, shift_size=None):
 
 
 class WindowAttention3D(nn.Module):
-    """ Window based multi-head self attention (W-MSA) module with relative position bias.
+    """Window based multi-head self attention (W-MSA) module with relative position bias.
     It supports both of shifted and non-shifted window.
     Args:
         dim (int): Number of input channels.
@@ -231,7 +231,7 @@ class WindowAttention3D(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x, mask=None, fmask=None):
-        """ Forward function.
+        """Forward function.
         Args:
             x: input features with shape of (num_windows*B, N, C)
             mask: (0/-inf) mask with shape of (num_windows, N, N) or None
@@ -310,7 +310,7 @@ class WindowAttention3D(nn.Module):
 
 
 class SwinTransformerBlock3D(nn.Module):
-    """ Swin Transformer Block.
+    """Swin Transformer Block.
 
     Args:
         dim (int): Number of input channels.
@@ -459,7 +459,7 @@ class SwinTransformerBlock3D(nn.Module):
         return self.drop_path(self.mlp(self.norm2(x)))
 
     def forward(self, x, mask_matrix):
-        """ Forward function.
+        """Forward function.
 
         Args:
             x: Input feature, tensor size (B, D, H, W, C).
@@ -483,7 +483,7 @@ class SwinTransformerBlock3D(nn.Module):
 
 
 class PatchMerging(nn.Module):
-    """ Patch Merging Layer
+    """Patch Merging Layer
 
     Args:
         dim (int): Number of input channels.
@@ -497,7 +497,7 @@ class PatchMerging(nn.Module):
         self.norm = norm_layer(4 * dim)
 
     def forward(self, x):
-        """ Forward function.
+        """Forward function.
 
         Args:
             x: Input feature, tensor size (B, D, H, W, C).
@@ -553,7 +553,7 @@ def compute_mask(D, H, W, window_size, shift_size, device):
 
 
 class BasicLayer(nn.Module):
-    """ A basic Swin Transformer layer for one stage.
+    """A basic Swin Transformer layer for one stage.
 
     Args:
         dim (int): Number of feature channels
@@ -624,7 +624,7 @@ class BasicLayer(nn.Module):
             self.downsample = downsample(dim=dim, norm_layer=norm_layer)
 
     def forward(self, x):
-        """ Forward function.
+        """Forward function.
 
         Args:
             x: Input feature, tensor size (B, C, D, H, W).
@@ -653,7 +653,7 @@ class BasicLayer(nn.Module):
 
 
 class PatchEmbed3D(nn.Module):
-    """ Video to Patch Embedding.
+    """Video to Patch Embedding.
 
     Args:
         patch_size (int): Patch token size. Default: (2,4,4).
@@ -699,7 +699,7 @@ class PatchEmbed3D(nn.Module):
 
 
 class SwinTransformer3D(nn.Module):
-    """ Swin Transformer backbone.
+    """Swin Transformer backbone.
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
           https://arxiv.org/pdf/2103.14030
 
@@ -865,17 +865,22 @@ class SwinTransformer3D(nn.Module):
             else:
                 if L1 != L2:
                     S1 = int(L1 ** 0.5)
-                    relative_position_bias_table_pretrained_resized = torch.nn.functional.interpolate(
-                        relative_position_bias_table_pretrained.permute(1, 0).view(
-                            1, nH1, S1, S1
-                        ),
-                        size=(2 * self.window_size[1] - 1, 2 * self.window_size[2] - 1),
-                        mode="bicubic",
+                    relative_position_bias_table_pretrained_resized = (
+                        torch.nn.functional.interpolate(
+                            relative_position_bias_table_pretrained.permute(1, 0).view(
+                                1, nH1, S1, S1
+                            ),
+                            size=(
+                                2 * self.window_size[1] - 1,
+                                2 * self.window_size[2] - 1,
+                            ),
+                            mode="bicubic",
+                        )
                     )
-                    relative_position_bias_table_pretrained = relative_position_bias_table_pretrained_resized.view(
-                        nH2, L2
-                    ).permute(
-                        1, 0
+                    relative_position_bias_table_pretrained = (
+                        relative_position_bias_table_pretrained_resized.view(
+                            nH2, L2
+                        ).permute(1, 0)
                     )
             state_dict[k] = relative_position_bias_table_pretrained.repeat(
                 2 * wd - 1, 1

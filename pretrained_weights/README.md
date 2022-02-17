@@ -1,8 +1,9 @@
 # Pretrained Weights
 
-Please download the pretrained weights from Google Drive.
+From version >=0.6.1, we supported automatic downloading of model weights while embedding the FAST-VQA into your scripts like ```from fastvqa import deep_end_to_end_vqa; deep_end_to_end_vqa(True)```.
 
-FAST-VQA: [link](https://drive.google.com/file/d/1OvhTQObKGjKGBBlzxrhw94_z9aB6EHI9/view?usp=sharing)
-FASTER-VQA: not yet available
+Still, we provide the temporary download link for the two following weights.
 
-After downloading, please put the weights in this directory.
+[FAST-VQA](https://github.com/TimothyHTimothy/BasicVQA/releases/download/v0.22.0/fast.pth)
+
+[FASTER-VQA](https://github.com/TimothyHTimothy/BasicVQA/releases/download/v0.22.0/faster.pth)

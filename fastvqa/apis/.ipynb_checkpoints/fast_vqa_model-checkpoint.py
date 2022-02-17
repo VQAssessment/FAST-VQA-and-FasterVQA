@@ -1,4 +1,7 @@
 import torch
+import requests
+import glob
+from tqdm import tqdm
 
 from fastvqa.models import BaseEvaluator
 from fastvqa.datasets import SampleFrames, get_fragments
@@ -6,8 +9,14 @@ from fastvqa.datasets import SampleFrames, get_fragments
 
 class VQAModel:
     def __init__(
-        self, pretrained=False, pretrained_path=None, model_type="fast", device="cpu"
+        self,
+        pretrained=False,
+        pretrained_path="pretrained_weights/{model_type}_vqa_v0_3.pth",
+        model_type="fast",
+        device="cpu",
     ):
+
+        pretrained_path = pretrained_path.replace("{model_type}", model_type)
 
         self.sampler = (
             SampleFrames(32, 2, 4) if model_type == "fast" else SampleFrames(16, 2, 4)
@@ -23,10 +32,16 @@ class VQAModel:
         self.std = torch.FloatTensor([0.2290, 0.2240, 0.2250]).to(device)
 
         if pretrained:
-            if pretrained_path is None:
-                raise NotImplementedError(
-                    "Cannot directly get web pretrained path now."
+            if not glob.glob(pretrained_path):
+                model_path = requests.get(
+                    f"https://github.com/TimothyHTimothy/BasicVQA/releases/download/v0.22.0/{model_type}.pth",
+                    stream=True,
                 )
+                with open(pretrained_path, "wb") as f:
+                    for chunk in tqdm(model_path.iter_content(chunk_size=1024)):
+                        f.write(chunk)
+                    print(f"Successfully downloaded model path to {pretrained_path}")
+                self.load_pretrained(pretrained_path, device)
             else:
                 self.load_pretrained(pretrained_path, device)
 
@@ -72,7 +87,10 @@ class VQAModel:
 
 
 def deep_end_to_end_vqa(
-    pretrained=False, pretrained_path=None, model_type="fast", device="cpu"
+    pretrained=False,
+    pretrained_path="pretrained_weights/{model_type}_vqa_v0_3.pth",
+    model_type="fast",
+    device="cpu",
 ):
     return VQAModel(
         pretrained,

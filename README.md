@@ -1,6 +1,6 @@
 # FAST-VQA
 
-*Version: 0.6.1*
+*Version: 0.6.2*
 
 The official open source training and inference code for our paper "FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling". \[[Arxiv Edition](NA)\].
 
@@ -78,18 +78,18 @@ You can install this directory by running
 pip install .
 ```
 
-And download the pretrained weights from [GDrive](pretrained_weights/README.md) and put them into `/pretrained_weights`.
-
 Then you can embed these lines into your python scripts:
 
 ```python
 from fastvqa import deep_end_to_end_vqa
 
-video = torch.randn((3,96,224,224))
-vq_evaluator = deep_end_to_end_vqa(pretrained=True, pretrained_path='pretrained_weights/fast_vqa_v0_3.pth')
-score = vq_evaluator(video)
+dum_video = torch.randn((3,240,720,1080)) # A sample 720p, 240-frame video
+vqa = deep_end_to_end_vqa(True, model_type=model_type)
+score = vqa(dum_video)
 print(score)
 ```
+
+This script will automatically download the pretrained model weights on LSVQ.
 
 ### Benchmarking FAST-VQA
 
