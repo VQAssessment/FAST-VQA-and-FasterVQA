@@ -36,7 +36,7 @@ def deterministic_split(dataset_path, ann_file, start=0, end=-1):
     return video_infos[start:end]
 
 
-def predict_dataset(args, dataset, model, device):
+def predict_dataset(args, dataset, dataset_hp, model, device):
 
     print(f"Predicting video quality on dataset: {dataset}.")
 
@@ -57,20 +57,14 @@ def predict_dataset(args, dataset, model, device):
         inference_set = VQAInferenceDataset(
             test_infos,
             dataset_path,
-            fsize=args.fsize,
-            fragments=224 // args.fsize,
-            nfrags=args.famount,
-            cache_in_memory=args.cache,
+            **dataset_hp,
         )
     else:
         dataset_path = f"{args.pdpath}/{dataset_name}"
         inference_set = VQAInferenceDataset(
             f"examplar_data_labels/{dataset_name}/labels.txt",
             dataset_path,
-            fsize=args.fsize,
-            fragments=224 // args.fsize,
-            nfrags=args.famount,
-            cache_in_memory=args.cache,
+            **dataset_hp,
         )
 
     print(f"Inference on Dataset {args.dataset} in {dataset_path}")
@@ -98,14 +92,16 @@ def predict_dataset(args, dataset, model, device):
                     if args.reduction:
                         res_ = (
                             model(
-                                vfrag[i * max_testing_views:(i + 1) * max_testing_views]
+                                vfrag[
+                                    i * max_testing_views : (i + 1) * max_testing_views
+                                ]
                             )
                             .reshape(max_testing_views // 4, -1)
                             .mean(1)
                         )
                     else:
                         res_ = model(
-                            vfrag[i * max_testing_views:(i + 1) * max_testing_views]
+                            vfrag[i * max_testing_views : (i + 1) * max_testing_views]
                         )
                     res_collections.append(res_)
                 result["pr_labels"] = torch.cat(res_collections, 0).cpu().numpy()
@@ -171,6 +167,14 @@ def main():
     parser.add_argument(
         "-r", "--reduction", action="store_true", help="reduce_local_quality_maps"
     )
+    parser.add_argument(
+        "-m",
+        "--model_type",
+        type=str,
+        default="fast",
+        help="choose whether to use FAST-VQA or the FASTER-VQA",
+    )
+
 
     args = parser.parse_args()
 
@@ -182,13 +186,38 @@ def main():
         device = "cpu"
 
     # defining model and loading checkpoint
+    
+    if args.model_type == "fast":
+        ## Hyper Parameters for FAST-VQA fine-tune
+        dataset_hp = dict(
+            fragments=7,
+            fsize=args.fsize,
+            nfrags=args.famount,
+            cache_in_memory=False,
+            clip_len=32,
+            aligned=32,
+        )
+        backbone_hp = dict(window_size=(8, 7, 7), frag_biases=[True, True, True, False])
+    else:
+        # Hyper Parameters for FASTER-VQA fine-tune
+        dataset_hp = dict(
+            fragments=4,
+            fsize=args.fsize,
+            nfrags=args.famount,
+            cache_in_memory=args.cache,
+            clip_len=16,
+            aligned=8,
+        )
+        backbone_hp = dict(
+            window_size=(4, 4, 4), frag_biases=[False, False, True, False]
+        )
 
-    model = BaseEvaluator().to(device)
+    model = BaseEvaluator(backbone_hp).to(device)
     if args.fsize != 32:
         raise NotImplementedError(
             "Version 0.x does not support fragment size other than 32."
         )
-    load_path = f"pretrained_weights/fast_vqa_v0_3.pth"
+    load_path = f"pretrained_weights/{args.model_type}_vqa_v0_3.pth"
     state_dict = torch.load(load_path, map_location="cpu")
 
     if "state_dict" in state_dict:
@@ -197,7 +226,6 @@ def main():
 
         i_state_dict = OrderedDict()
         for key in state_dict.keys():
-            print(key)
             if "cls" in key:
                 tkey = key.replace("cls", "vqa")
                 i_state_dict[tkey] = state_dict[key]
@@ -209,12 +237,12 @@ def main():
     if args.dataset == "all":
         for dataset in all_datasets:
             start = time()
-            predict_dataset(args, dataset, model, device)
+            predict_dataset(args, dataset, dataset_hp, model, device)
             end = time()
             print(f"Time: {end - start:.4e}s.")
     else:
         start = time()
-        predict_dataset(args, args.dataset, model, device)
+        predict_dataset(args, args.dataset, dataset_hp, model, device)
         end = time()
         print(f"Time: {end - start:.4e}s.")
 

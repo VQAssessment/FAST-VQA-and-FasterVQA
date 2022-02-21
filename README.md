@@ -1,10 +1,12 @@
 # FAST-VQA
 
-*Version: 0.6.2*
+*PreRelease Version: 0.7.0*
+
+## Intro
 
 The official open source training and inference code for our paper "FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling". \[[Arxiv Edition](NA)\].
 
-Live Fragments:
+Examples on Live Fragments:
 
 ![Frag](./demos/fr1.gif)
 (From LIVE-VQC, 720p, Original Score **38.24**)
@@ -31,7 +33,7 @@ Our sparse and efficient sub-sampling also reaches at least 99.5% relative accur
 See in [quality map demos](./demos/) for examples on local quality maps.
 
 
-## Build FAST-VQA
+## Installation
 
 ### Requirements
 
@@ -49,15 +51,23 @@ To get all the requirements, please run
 pip install -r requirements.txt
 ```
 
-Or directly run 
+### Direct install
+
+You can run
 
 ```shell
 pip install .
 ```
 
-to build the full FAST-VQA.
+or 
 
-## Test FAST-VQA
+```shell
+python setup.py installl
+```
+
+to install the full FAST-VQA with its requirements.
+
+## Usage
 
 ### Visualize *fragments*
 
@@ -66,6 +76,12 @@ If you would like to visualize the proposed *fragments*, you can generate the de
 
 ```shell
 python visualize.py -d $DATASET$ 
+```
+
+You can also visualize the patch-wise local quality maps rendered on fragments, via 
+
+```shell
+python visualize.py -d $DATASET$  -nm
 ```
 
 
@@ -144,9 +160,9 @@ python inference.py -d $DATASET$ --from_ar
 
 Supported datasets are KoNViD-1k, LIVE_VQC, CVD2014, YouTube-UGC.
 
-## Using FASTER-VQA
+## Switching to FASTER-VQA
 
-You can add the argument `-m FASTER` in any scripts above to switch to FASTER-VQA instead of FAST-VQA.
+You can add the argument `-m FASTER` in any scripts (```finetune.py, inference.py, visualize.py```) above to switch to FASTER-VQA instead of FAST-VQA.
 
 ## Citation
 
@@ -154,7 +170,7 @@ Please cite the following paper when using this repo.
 
 ```
 @article{wu2022fastquality,
-  title={FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sub-sampling},
+  title={FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling},
   author={Wu, Haoning and Chen, Chaofeng and Hou, Jingwen and Wang, Annan and Sun, Wenxiu and Yan, Qiong and Weisi, Lin},
   journal={arXiv preprint},
   year={2022}
