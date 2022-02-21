@@ -300,7 +300,7 @@ def main():
         else:
             if args.fsize != 32:
                 raise NotImplementedError(
-                    "Version 0.3.0 only supports 32*32 finetune on fragments."
+                    "Version 0.x only supports 32*32 finetune on fragments."
                 )
             load_path = f"pretrained_weights/{args.model_type}_vqa_v0_3.pth"
         state_dict = torch.load(load_path, map_location=device)
