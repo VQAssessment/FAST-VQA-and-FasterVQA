@@ -78,11 +78,18 @@ def generate_dataset(args, dataset, seed=42, dataset_hp=dict()):
         val_dataset_path = f"{args.pdpath}/{val_dataset_name}"
         val_infos = f"examplar_data_labels/{val_dataset_name}/labels.txt"
         finetune_set = VQAInferenceDataset(
-            train_infos, train_dataset_path, num_clips=1, phase="train", **dataset_hp,
+            train_infos,
+            train_dataset_path,
+            num_clips=1,
+            phase="train",
+            **dataset_hp,
         )
 
         validation_set = VQAInferenceDataset(
-            val_infos, val_dataset_path, num_clips=4, **dataset_hp,
+            val_infos,
+            val_dataset_path,
+            num_clips=4,
+            **dataset_hp,
         )
 
     else:
@@ -97,11 +104,18 @@ def generate_dataset(args, dataset, seed=42, dataset_hp=dict()):
         )
 
         finetune_set = VQAInferenceDataset(
-            train_infos, dataset_path, num_clips=1, phase="train", **dataset_hp,
+            train_infos,
+            dataset_path,
+            num_clips=1,
+            phase="train",
+            **dataset_hp,
         )
 
         validation_set = VQAInferenceDataset(
-            val_infos, dataset_path, num_clips=4, **dataset_hp,
+            val_infos,
+            dataset_path,
+            num_clips=4,
+            **dataset_hp,
         )
 
         print(
@@ -197,6 +211,8 @@ def main():
             "YouTubeUGC",
             "LSVQ-LIVE_VQC",
             "LSVQ-KoNViD",
+            "KoNViD-LIVE_VQC",
+            "LIVE_VQC-KoNViD",
         ],
         default="LIVE_VQC",
         help="the finetune dataset name",
@@ -207,7 +223,7 @@ def main():
     parser.add_argument(
         "-s", "--fsize", choices=[8, 16, 32], default=32, help="size of fragment strips"
     )
-    parser.add_argument("-b", "--bs", type=int, default=8, help="batchsize")
+    parser.add_argument("-b", "--bs", type=int, default=16, help="batchsize")
     parser.add_argument(
         "-a", "--famount", type=int, default=1, help="sample amount of fragment strips"
     )
@@ -312,15 +328,27 @@ def main():
             args, seed=42 * (i + 1), dataset_hp=dataset_hp
         )
 
-        ## finetune the model
+        # finetune the model
         print(len(ft_loader), len(val_loader))
-        optimizer = torch.optim.AdamW(lr=1e-4, params=model.parameters())
+        # update the differentiative learning rate
+        optimizer = torch.optim.AdamW(
+            lr=1e-3,
+            params=[
+                {"params": model.backbone.parameters(), "lr": 1e-4},
+                {"params": model.vqa_head.parameters(), "lr": 1e-3},
+            ],
+        )
 
         best_ = -1, -1, -1, 1000
         best_ = inference_set(val_loader, model, device, best_)
 
         print(
-            f"Before the finetune process on {args.dataset} with {len(val_loader)} videos, \nthe accuracy of the model is as follows:\n  SROCC: {best_[0]:.4f}\n  PLCC:  {best_[1]:.4f}\n  KROCC: {best_[2]:.4f}\n  RMSE:  {best_[3]:.4f}."
+            f"""Before the finetune process on {args.dataset} with {len(val_loader)} videos, 
+            the accuracy of the model is as follows:
+            SROCC: {best_[0]:.4f}
+            PLCC:  {best_[1]:.4f}
+            KROCC: {best_[2]:.4f}
+            RMSE:  {best_[3]:.4f}."""
         )
 
         for param in model.backbone.parameters():
@@ -332,7 +360,12 @@ def main():
             best_ = inference_set(val_loader, model, device, best_)
 
         print(
-            f"For the linear transfer process on {args.dataset} with {len(val_loader)} videos, \nthe best validation accuracy of the model is as follows:\n  SROCC: {best_[0]:.4f}\n  PLCC:  {best_[1]:.4f}\n  KROCC: {best_[2]:.4f}\n  RMSE:  {best_[3]:.4f}."
+            f"""For the linear transfer process on {args.dataset} with {len(val_loader)} videos,
+            the best validation accuracy of the model is as follows:
+            SROCC: {best_[0]:.4f}
+            PLCC:  {best_[1]:.4f}
+            KROCC: {best_[2]:.4f}
+            RMSE:  {best_[3]:.4f}."""
         )
 
         for param in model.backbone.parameters():
@@ -344,7 +377,12 @@ def main():
             best_ = inference_set(val_loader, model, device, best_)
 
         print(
-            f"For the finetune process on {args.dataset} with {len(val_loader)} videos, \nthe best validation accuracy of the model is as follows:\n  SROCC: {best_[0]:.4f}\n  PLCC:  {best_[1]:.4f}\n  KROCC: {best_[2]:.4f}\n  RMSE:  {best_[3]:.4f}."
+            f"""For the finetune process on {args.dataset} with {len(val_loader)} videos,
+            the best validation accuracy of the model is as follows:
+            SROCC: {best_[0]:.4f}
+            PLCC:  {best_[1]:.4f}
+            KROCC: {best_[2]:.4f}
+            RMSE:  {best_[3]:.4f}."""
         )
 
         bests_.append(best_)
