@@ -2,10 +2,10 @@ import torch
 import requests
 import glob
 from tqdm import tqdm
+import time
 
 from fastvqa.models import BaseEvaluator
 from fastvqa.datasets import SampleFrames, get_fragments
-
 
 class VQAModel:
     def __init__(
@@ -15,12 +15,12 @@ class VQAModel:
         model_type="fast",
         device="cpu",
     ):
+        self.num_frames = 32 if model_type == "fast" else 16
+        self.aligned = 32 if model_type == "fast" else 8
 
         pretrained_path = pretrained_path.replace("{model_type}", model_type)
 
-        self.sampler = (
-            SampleFrames(32, 2, 4) if model_type == "fast" else SampleFrames(16, 2, 4)
-        )
+        self.sampler = SampleFrames(self.num_frames, 2, 4)
         self.fragments = 7 if model_type == "fast" else 4
         backbone_hp = (
             dict(window_size=(4, 4, 4), frag_biases=[False, False, True, False])
@@ -73,13 +73,16 @@ class VQAModel:
         if verbose:
             print(sampled_frames)
         x = x[:, sampled_frames]
-        x = get_fragments(x, self.fragments)
+        x = get_fragments(x, self.fragments, aligned = self.aligned)
         x = ((x.permute(1, 2, 3, 0) - self.mean) / self.std).permute(3, 0, 1, 2)
-        x = x.reshape((3, 4, 32) + x.shape[2:]).transpose(0, 1)
+        x = x.reshape((3, 4, self.num_frames) + x.shape[2:]).transpose(0, 1)
+        start = time.time()
         y = self.model(x)
+        end = time.time()
         if verbose:
             print(x.shape, y.shape)
         return {
+            "time": end - start,
             "score": torch.mean(y).item(),
             "local_scores": y.cpu().numpy() if local_scores else None,
             "input_tensor": x.cpu().numpy() if return_fragments else None,
@@ -98,3 +101,28 @@ def deep_end_to_end_vqa(
         model_type=model_type,
         device=device,
     )
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-v",type=str, default="test_video/A001.mp4", help="path of the demo video",)
+    parser.add_argument("-d",type=str, default="cuda", help="preferred device",)
+    parser.add_argument("-m",type=str, default="fast", help="model type",)
+    args = parser.parse_args()
+    model = deep_end_to_end_vqa(True, model_type=args.m, device=args.d)
+    try:
+        import decord
+        decord.bridge.set_bridge("torch")
+        input_video = (decord.VideoReader(args.v)[:] / 255.).permute(3,0,1,2).to(args.d)
+    except:
+        ## compatible version for Apple M1 which does not support decord
+        from torchvision.io import read_video
+        input_video = (read_video(args.v)[0] / 255.).permute(3,0,1,2).to(args.d)
+    
+    for i in range(3):
+        output = model(input_video)
+        score, durtime = output["score"], output["time"]
+    print(score, durtime)
+    
+    
