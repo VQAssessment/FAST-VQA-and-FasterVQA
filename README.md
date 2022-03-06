@@ -1,6 +1,6 @@
 # FAST-VQA
 
-*PreRelease Version: 0.7.0*
+*PreRelease Version: 0.8.0*
 
 ## Intro
 
@@ -132,9 +132,9 @@ You might need to download the original [Swin-T Weights](https://github.com/Swin
 This training will split the dataset into 10 random train/test splits (with random seed 42) and report the best result on the random split of the test dataset. 
 
 ```shell
-python inference.py -d $DATASET$ --from_ar
+python train.py -d $DATASET$ --from_ar
 ```
-
+p
 Supported datasets are KoNViD-1k, LIVE_VQC, CVD2014, YouTube-UGC.
 
 #### Cross Dataset Training

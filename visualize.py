@@ -32,7 +32,7 @@ def t_rescale(pr, gt=None):
     return pr
 
 
-def save_visualizations(args, inference_set, model=None, device="cpu", seed=42):
+def save_visualizations(args, inference_set, model=None, device="cpu", seed=84):
     os.makedirs(
         f"{args.save_dir}/{args.dataset.lower()}_{args.model_type}", exist_ok=True
     )
