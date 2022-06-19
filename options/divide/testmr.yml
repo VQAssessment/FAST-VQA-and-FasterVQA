@@ -1,0 +1,375 @@
+name: Test_with_multiple_resolutions
+
+num_epochs: 30
+l_num_epochs: 0
+warmup_epochs: 2.5
+ema: true
+save_model: true
+batch_size: 16
+num_workers: 6
+
+need_upsampled: true
+need_feat: true
+need_fused: false
+
+wandb:
+    project_name: VQA_Experiments_2022
+
+data:
+    cval_plus_16f_live_vqc:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
+            data_prefix: ../datasets/LIVE_VQC
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 6
+                    fragments_w: 6
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+                resize:
+                    size_h: 192
+                    size_w: 192
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+    cval_32f_live_vqc:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
+            data_prefix: ../datasets/LIVE_VQC
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+                resize:
+                    size_h: 160
+                    size_w: 160
+            clip_len: 32
+            frame_interval: 2
+            num_clips: 4
+    cval_plus_32f_live_vqc:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
+            data_prefix: ../datasets/LIVE_VQC
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 6
+                    fragments_w: 6
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+                resize:
+                    size_h: 192
+                    size_w: 192
+            clip_len: 32
+            frame_interval: 2
+            num_clips: 4
+    cval_16f_live_vqc:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
+            data_prefix: ../datasets/LIVE_VQC
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+                resize:
+                    size_h: 160
+                    size_w: 160
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+    cval_kv1k:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/KoNViD/labels.txt
+            data_prefix: ../datasets/KoNViD
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+                resize:
+                    size_h: 160
+                    size_w: 160
+            clip_len: 32
+            frame_interval: 2
+            num_clips: 4
+    cval_plus_kv1k:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/KoNViD/labels.txt
+            data_prefix: ../datasets/KoNViD
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 6
+                    fragments_w: 6
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+                resize:
+                    size_h: 192
+                    size_w: 192
+            clip_len: 32
+            frame_interval: 2
+            num_clips: 4
+    cval_16f_kv1k:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/KoNViD/labels.txt
+            data_prefix: ../datasets/KoNViD
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+                resize:
+                    size_h: 160
+                    size_w: 160
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+    cval_plus_16f_kv1k:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/KoNViD/labels.txt
+            data_prefix: ../datasets/KoNViD
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 6
+                    fragments_w: 6
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+                resize:
+                    size_h: 192
+                    size_w: 192
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+    cval_plus_lsvq_test:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_test.txt
+            data_prefix: ../datasets/LSVQ
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 6
+                    fragments_w: 6
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+                resize:
+                    size_h: 192
+                    size_w: 192
+            clip_len: 32
+            frame_interval: 2
+            num_clips: 4
+    cval_16f_lsvq_test:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_test.txt
+            data_prefix: ../datasets/LSVQ
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+                resize:
+                    size_h: 160
+                    size_w: 160
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+    cval_lsvq_test:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_test.txt
+            data_prefix: ../datasets/LSVQ
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+                resize:
+                    size_h: 160
+                    size_w: 160
+            clip_len: 32
+            frame_interval: 2
+            num_clips: 4
+    cval_plus_16f_lsvq_test:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_test.txt
+            data_prefix: ../datasets/LSVQ
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 6
+                    fragments_w: 6
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+                resize:
+                    size_h: 192
+                    size_w: 192
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+    cval_plus_lsvq_1080p:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_1080p.txt
+            data_prefix: ../datasets/LSVQ
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 6
+                    fragments_w: 6
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+                resize:
+                    size_h: 192
+                    size_w: 192
+            clip_len: 32
+            frame_interval: 2
+            num_clips: 4
+    cval_16f_lsvq_1080p:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_1080p.txt
+            data_prefix: ../datasets/LSVQ
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+                resize:
+                    size_h: 160
+                    size_w: 160
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+    cval_lsvq_1080p:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_1080p.txt
+            data_prefix: ../datasets/LSVQ
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+                resize:
+                
+                    size_h: 160
+                    size_w: 160
+            clip_len: 32
+            frame_interval: 2
+            num_clips: 4
+    cval_plus_16f_lsvq_1080p:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_1080p.txt
+            data_prefix: ../datasets/LSVQ
+            #data_backend: ceph
+            sample_types:
+                ## During test, we do not need the upsampled samples.
+                fragments:
+                    fragments_h: 6
+                    fragments_w: 6
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+                resize:
+                
+                    size_h: 192
+                    size_w: 192
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+model:
+    type: DiViDeAddEvaluator
+    args:
+        divide_head: true # if true, different branches will not share head
+        vqa_head:
+            in_channels: 768
+            hidden_channels: 64
+            
+optimizer:
+    lr: !!float 1e-3
+    backbone_lr_mult: !!float 1e-1
+    wd: 0.05
+        
+load_path: ../model_baselines/NetArch/swin_tiny_patch244_window877_kinetics400_1k.pth
+test_load_path: ./pretrained_weights/DiViDe-MRSSSL-DivideHead-BiLearn-8P_s_dev_v0.0.pth
+
+
+    
+        

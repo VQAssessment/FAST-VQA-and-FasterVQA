@@ -1,0 +1,66 @@
+name: FAST-VQA-M-Refactor
+
+num_epochs: 30
+l_num_epochs: 0
+warmup_epochs: 2.5
+ema: false
+save_model: false
+batch_size: 16
+num_workers: 6
+
+wandb:
+    project_name: VQA_Experiments_2022
+
+data:
+    train:
+        type: FusionDataset
+        args:
+            phase: train
+            anno_file: ./examplar_data_labels/train_labels.txt
+            data_prefix: ../datasets/LSVQ
+            sample_types:
+                fragments:
+                    fragments_h: 4
+                    fragments_w: 4
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 8
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 1
+    val:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/KoNViD/labels.txt
+            data_prefix: ../datasets/KoNViD
+            sample_types:
+                fragments:
+                    fragments_h: 4
+                    fragments_w: 4
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 8
+            clip_len: 16
+            frame_interval: 2
+            num_clips: 4
+        
+model:
+    type: DiViDeEvaluator
+    args:
+        vqa_head:
+            in_channels: 768
+            hidden_channels: 64
+            
+optimizer:
+    lr: !!float 1e-3
+    backbone_lr_mult: !!float 1e-1
+    wd: 0.05
+        
+load_path: ./pretrained_weights/fast-m_vqa_v0_3.pth
+
+
+
+
+    
+        

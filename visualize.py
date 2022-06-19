@@ -5,13 +5,13 @@ import os
 import cv2
 import argparse
 import torch
-from torchvision.io import write_video
-from fastvqa import VQAInferenceDataset, BaseEvaluator
+from torchvision.io import write_video, write_png
+from fastvqa import FragmentVideoDataset, BaseEvaluator
 
 
 def get_vis_dataset(args, model_type="fast"):
     dataset_path = f"{args.pdpath}/{args.dataset}"
-    inference_set = VQAInferenceDataset(
+    inference_set = FragmentVideoDataset(
         f"{dataset_path}/labels.txt",
         dataset_path,
         fragments=7 if model_type == "fast" else 4,
@@ -32,40 +32,55 @@ def t_rescale(pr, gt=None):
     return pr
 
 
-def save_visualizations(args, inference_set, model=None, device="cpu", seed=84):
+def save_visualizations(args, inference_set, model=None, device="cpu"):
     os.makedirs(
         f"{args.save_dir}/{args.dataset.lower()}_{args.model_type}", exist_ok=True
     )
-    random.seed(seed)
     mean, std = np.array([123.675, 116.28, 103.53]), np.array([58.395, 57.12, 57.375])
 
     results = []
 
     for _ in tqdm(range(args.vs)):
         q = random.randrange(len(inference_set))
+        # q = 1679
         data = inference_set.__getitem__(q, need_original_frames=True)
         vfrag, video = data["video"], data["original_video"]
         if model is not None:
             vfrag = vfrag.to(device)
             with torch.no_grad():
+                vr = model(vfrag)
                 result = torch.nn.functional.interpolate(
-                    model(vfrag), scale_factor=(2, 32, 32), mode="nearest"
+                    vr, scale_factor=(2, 32, 32), mode="nearest"
+                ).cpu()
+                vresult = torch.nn.functional.interpolate(
+                    vr, size=video.shape[2:], mode="trilinear"
                 ).cpu()
             results.append(
-                (vfrag, video, result, data["original_shape"], data["gt_label"], q)
+                (
+                    vfrag,
+                    video,
+                    result,
+                    vresult,
+                    data["original_shape"],
+                    data["gt_label"],
+                    q,
+                )
             )
         else:
             results.append(
-                (vfrag, video, None, data["original_shape"], data["gt_label"], q)
+                (vfrag, video, None, None, data["original_shape"], data["gt_label"], q)
             )
 
     if results[0][2] is not None:
-        res_res = t_rescale(torch.cat([r[2] for r in results], 0))
+        res_res = torch.cat([t_rescale(r[2]) for r in results], 0)
+        vres_res = [t_rescale(r[3]) for r in results]
     else:
         res_res = None
+        vres_res = None
 
     for i, result in enumerate(tqdm(results)):
-        vfrag, video, _, shape, label, q = result
+
+        vfrag, video, _, _, shape, label, q = result
         if res_res is not None:
             result = (
                 torch.cat(
@@ -80,18 +95,41 @@ def save_visualizations(args, inference_set, model=None, device="cpu", seed=84):
                 .cpu()
                 .numpy()
             )
+            vresult = torch.cat(
+                (
+                    vres_res[i][0],
+                    -vres_res[i][0],
+                    torch.zeros_like(vres_res[i][0]),
+                ),
+                0,
+            )
+            vresult = torch.nn.functional.interpolate(
+                vresult, scale_factor=1 / (min(vresult.shape[2:]) / 540)
+            )
+            vresult = vresult.permute(1, 2, 3, 0).cpu().numpy()
 
         frag = vfrag.squeeze(0).permute(1, 2, 3, 0).cpu().numpy() * std + mean
 
-        if res_res is not None:
-            frag = (frag - result * frag.mean() / 2).clip(0, 255)
+        video = video.squeeze(0)
+        scale = min(video.shape[2:]) / 540
+        video = torch.nn.functional.interpolate(video.float(), scale_factor=1 / scale)
+        video = video.permute(1, 2, 3, 0).cpu().numpy()
 
-        video = video.squeeze(0).permute(1, 2, 3, 0).cpu().numpy()
+        if res_res is not None:
+            frag = np.concatenate((frag, -result * 80), 2).clip(0, 255)
+            video = (
+                np.concatenate((video, video - vresult * video.mean() / 2), 2)
+                .clip(0, 255)
+                .astype(np.uint8)
+            )
+            # video = np.concatenate([cv2.resize(video[i])],0)
 
         save_dir = f"{args.save_dir}/{args.dataset.lower()}_{args.model_type}/{q}_{label:.2f}_{shape}"
 
         os.makedirs(save_dir, exist_ok=True)
         write_video(f"{save_dir}/fr.mp4", frag, 15)
+        # for j in range(32):
+        #  write_png(torch.from_numpy(video[j]).permute(2,0,1), f"{save_dir}/vr_{j}.png", 1)
         write_video(f"{save_dir}/vr.mp4", video, 15)
 
 
@@ -113,7 +151,7 @@ def main():
     parser.add_argument(
         "--save_dir",
         type=str,
-        default="demo_fragments_with_originals",
+        default="demo_",
         help="results_dir",
     )
     parser.add_argument(

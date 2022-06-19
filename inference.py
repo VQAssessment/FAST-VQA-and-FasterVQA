@@ -1,7 +1,7 @@
 import torch
 import os.path as osp
 from fastvqa.models import BaseEvaluator
-from fastvqa.datasets import VQAInferenceDataset
+from fastvqa.datasets import FragmentVideoDataset
 
 import argparse
 
@@ -12,6 +12,7 @@ import numpy as np
 from time import time
 from tqdm import tqdm
 
+from thop import profile
 
 def rescale(pr, gt=None):
     if gt is None:
@@ -22,6 +23,14 @@ def rescale(pr, gt=None):
 
 
 all_datasets = ["LIVE_VQC", "KoNViD", "CVD2014", "LSVQ", "YouTubeUGC"]
+
+def profile_inference(inf_set, model, device):
+    video = {}
+    data = inf_set[0]
+    video = data["video"].to(device).squeeze(0)
+    with torch.no_grad():
+        flops, params = profile(model, (video, ))
+    print(f"The FLOps of the Variant is {flops/1e9:.1f}G, with Params {params/1e6:.2f}M.")
 
 
 def deterministic_split(dataset_path, ann_file, start=0, end=-1):
@@ -54,14 +63,14 @@ def predict_dataset(args, dataset, dataset_hp, model, device):
             int(end),
         )
 
-        inference_set = VQAInferenceDataset(
+        inference_set = FragmentVideoDataset(
             test_infos,
             dataset_path,
             **dataset_hp,
         )
     else:
         dataset_path = f"{args.pdpath}/{dataset_name}"
-        inference_set = VQAInferenceDataset(
+        inference_set = FragmentVideoDataset(
             f"examplar_data_labels/{dataset_name}/labels.txt",
             dataset_path,
             **dataset_hp,
@@ -76,6 +85,10 @@ def predict_dataset(args, dataset, dataset_hp, model, device):
         inference_set, batch_size=1, num_workers=6
     )
     results = []
+    
+    profile_inference(inference_set, model, device)
+
+
 
     # avoid GPU out of memory, this is set for Tesla V100, please scale based on your GPU
     max_testing_views = 24
@@ -122,6 +135,10 @@ def predict_dataset(args, dataset, dataset_hp, model, device):
     gt_labels = [r["gt_label"] for r in results]
     pr_labels = [np.mean(r["pr_labels"][:]) for r in results]
     pr_labels = rescale(pr_labels, gt_labels)
+    
+    import pickle as pkl
+    with open("gresult.pkl","wb") as f:
+        pkl.dump({"gt": gt_labels, "pr": pr_labels}, f)
 
     srocc = spearmanr(gt_labels, pr_labels)[0]
     plcc = pearsonr(gt_labels, pr_labels)[0]
@@ -175,7 +192,6 @@ def main():
         help="choose whether to use FAST-VQA or the FASTER-VQA",
     )
 
-
     args = parser.parse_args()
 
     # adaptively choose the device
@@ -186,7 +202,7 @@ def main():
         device = "cpu"
 
     # defining model and loading checkpoint
-    
+
     if args.model_type == "fast":
         ## Hyper Parameters for FAST-VQA fine-tune
         dataset_hp = dict(
