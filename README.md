@@ -12,7 +12,7 @@ Supports
 
 in Master Branch.
 
-The [Dev_Branch](/tree/dev) contain several new features which is more suitable for development of your own deep end-to-end VQA models.
+The [Dev_Branch](https://github.com/TimothyHTimothy/FAST-VQA/tree/dev) contain several new features which is more suitable for development of your own deep end-to-end VQA models.
 
 
 ## Intro
