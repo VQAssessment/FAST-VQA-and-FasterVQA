@@ -12,7 +12,7 @@ Supports
 
 in Master Branch.
 
-The [Dev_Branch](https://github.com/TimothyHTimothy/FAST-VQA/tree/dev) contain several new features which is more suitable for development of your own deep end-to-end VQA models.
+*The [Dev_Branch](https://github.com/TimothyHTimothy/FAST-VQA/tree/dev) contains several new features which is more suitable for development of your own deep end-to-end VQA models.*
 
 
 ## Intro
@@ -173,9 +173,9 @@ python inference.py -d $DATASET$ --from_ar
 
 Supported datasets are KoNViD-1k, LIVE_VQC, CVD2014, YouTube-UGC.
 
-## Switching to FASTER-VQA
+## Switching to FAST-VQA-M
 
-You can add the argument `-m FASTER` in any scripts (```finetune.py, inference.py, visualize.py```) above to switch to FASTER-VQA instead of FAST-VQA.
+You can add the argument `-m fast-m` in any scripts (```finetune.py, inference.py, visualize.py```) above to switch to FAST-VQA-M instead of FAST-VQA.
 
 ## Citation
 
