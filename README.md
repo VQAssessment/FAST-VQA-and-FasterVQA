@@ -2,6 +2,12 @@
 The official open source training and inference code for our paper "FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling".
 ---- To Appear in ECCV2022 ----
 
+[Arxiv Edition](https://arxiv.org/abs/2207.02595v1)
+
+**Pretrained weights:**
+- [FAST-VQA-M](https://github.com/TimothyHTimothy/FAST-VQA/releases/download/v1.0.0-open-release-weights/fast_vqa_m_v0_3.pth)
+- [FAST-VQA](https://github.com/TimothyHTimothy/FAST-VQA/releases/download/v1.0.0-open-release-weights/fast_vqa_v0_3.pth)
+
 Supports
 
 - Training with Large Dataset ```finetune.py```
@@ -17,7 +23,6 @@ in Master Branch.
 
 ## Intro
 
-You can view our [Preprint Edition](FAST_VQA_Paper.pdf) in this repo and our camera ready edition will be open soon.
 
 Examples on Live Fragments:
 
@@ -185,7 +190,7 @@ Please cite the following paper when using this repo.
 @article{wu2022fastquality,
   title={FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling},
   author={Wu, Haoning and Chen, Chaofeng and Hou, Jingwen and Wang, Annan and Sun, Wenxiu and Yan, Qiong and Weisi, Lin},
-  journal={European Conference of Computer Vision (ECCV)},
+  journal={Proceedings of European Conference of Computer Vision (ECCV)},
   year={2022}
 }
 ```
