@@ -1,10 +1,9 @@
-name: FAST-VQA-M-Refactor
-
+name: FAST-VQA-M-Refactor-1*4
 num_epochs: 30
 l_num_epochs: 0
 warmup_epochs: 2.5
-ema: false
-save_model: false
+ema: true
+save_model: true
 batch_size: 16
 num_workers: 6
 
@@ -28,12 +27,12 @@ data:
             clip_len: 16
             frame_interval: 2
             num_clips: 1
-    val:
+    val-livevqc:
         type: FusionDataset
         args:
             phase: test
-            anno_file: ./examplar_data_labels/KoNViD/labels.txt
-            data_prefix: ../datasets/KoNViD
+            anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
+            data_prefix: ../datasets/LIVE_VQC/
             sample_types:
                 fragments:
                     fragments_h: 4
@@ -46,8 +45,15 @@ data:
             num_clips: 4
         
 model:
-    type: DiViDeEvaluator
+    type: DiViDeAddEvaluator
     args:
+        backbone:
+            fragments:
+                checkpoint: false
+                pretrained: 
+        backbone_size: swin_tiny_grpb_m
+        backbone_preserve_keys: fragments
+        divide_head: false
         vqa_head:
             in_channels: 768
             hidden_channels: 64
@@ -57,10 +63,9 @@ optimizer:
     backbone_lr_mult: !!float 1e-1
     wd: 0.05
         
-load_path: ./pretrained_weights/fast-m_vqa_v0_3.pth
-
-
-
+load_path: ../pretrained/swin_tiny_patch244_window877_kinetics400_1k.pth
+test_load_path: ./pretrained_weights/FAST_VQA_M_1*4.pth
 
     
         
+

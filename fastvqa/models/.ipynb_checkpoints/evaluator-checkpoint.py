@@ -7,7 +7,7 @@ from .swin_backbone import SwinTransformer3D as VideoBackbone
 from .swin_backbone import swin_3d_tiny, swin_3d_small
 from .conv_backbone import convnext_3d_tiny, convnext_3d_small
 from .swin_backbone import SwinTransformer2D as ImageBackbone
-from .head import VQAHead, IQAHead
+from .head import VQAHead, IQAHead, VARHead
 
 
 class BaseEvaluator(nn.Module):
@@ -84,21 +84,28 @@ class DiViDeAddEvaluator(nn.Module):
     def __init__(
         self,
         backbone_size='swin_tiny',
+        backbone_preserve_keys = 'fragments,resize',
+        multi=False,
         backbone=dict(resize={"window_size": (4,4,4)}, fragments={"window_size": (4,4,4)}),
         divide_head=False,
         vqa_head=dict(in_channels=768),
+        var=False,
     ):
+        backbone_preserve_keys = backbone_preserve_keys.split(",")
+        self.multi = multi
         super().__init__()
-        if backbone_size == 'swin_tiny_grpb' and not divide_head:
-            ## For reproducing FAST-VQA
-            backbone.pop("resize")
         for key in backbone:
-            if isinstance(backbone_size, dict):
-                backbone_size
+            if key not in backbone_preserve_keys:
+                continue
+
             if backbone_size == 'swin_tiny':
                 b = swin_3d_tiny(**backbone[key])
             elif backbone_size == 'swin_tiny_grpb':
+                # to reproduce fast-vqa
                 b = VideoBackbone()
+            elif backbone_size == 'swin_tiny_grpb_m':
+                # to reproduce fast-vqa-m
+                b = VideoBackbone(window_size=(4,4,4), frag_biases=[0,0,0,0])
             elif backbone_size == 'swin_small':
                 b = swin_3d_small(**backbone[key])
             elif backbone_size == 'conv_tiny':
@@ -113,11 +120,21 @@ class DiViDeAddEvaluator(nn.Module):
         if divide_head:
             print(divide_head)
             for key in backbone:
-                b = VQAHead(**vqa_head)
+                if key not in backbone_preserve_keys:
+                    continue
+                if var:
+                    b = VARHead(**vqa_head)
+                    print(b)
+                else:
+                    b = VQAHead(**vqa_head)
                 print("Setting head:", key+"_head")
                 setattr(self, key+"_head", b) 
         else:
-            self.vqa_head = VQAHead(**vqa_head)
+            if var:
+                self.vqa_head = VARHead(**vqa_head)
+                print(b)
+            else:
+                self.vqa_head = VQAHead(**vqa_head)
 
     def forward(self, vclips, inference=True, return_pooled_feats=False, reduce_scores=True, **kwargs):
         if inference:
@@ -127,7 +144,7 @@ class DiViDeAddEvaluator(nn.Module):
                 scores = []
                 feats = {}
                 for key in vclips:
-                    feat = getattr(self, key+"_backbone")(vclips[key])
+                    feat = getattr(self, key+"_backbone")(vclips[key], multi=self.multi)
                     if hasattr(self, key+"_head"):
                         scores += [getattr(self, key+"_head")(feat)]
                     else:
@@ -147,7 +164,7 @@ class DiViDeAddEvaluator(nn.Module):
             scores = []
             feats = {}
             for key in vclips:
-                feat = getattr(self, key+"_backbone")(vclips[key]) 
+                feat = getattr(self, key+"_backbone")(vclips[key], multi=self.multi)
                 if hasattr(self, key+"_head"):
                     scores += [getattr(self, key+"_head")(feat)]
                 else:

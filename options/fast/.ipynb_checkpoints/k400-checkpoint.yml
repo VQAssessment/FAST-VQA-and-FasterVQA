@@ -1,0 +1,76 @@
+name: K400-Adapt
+num_epochs: 30
+l_num_epochs: 0
+warmup_epochs: 2.5
+ema: false
+save_model: true
+batch_size: 16
+num_workers: 6
+
+wandb:
+    project_name: VQA_Experiments_2022
+
+data:
+    train:
+        type: FusionDatasetK400
+        args:
+            phase: train
+            anno_file: ../datasets/Kinetics/kinetics-dataset/k400/train_labels.txt
+            data_prefix: ../datasets/Kinetics/kinetics-dataset/k400/train/
+            sample_types:
+                fragments:
+                    fragments_h: 7
+                    fragments_w: 7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+            clip_len: 32
+            frame_interval: 2
+            t_frag: 8
+            num_clips: 1
+    val:
+        type: FusionDatasetK400
+        args:
+            phase: test
+            anno_file: ../datasets/Kinetics/kinetics-dataset/k400/val_labels.txt
+            data_prefix: ../datasets/Kinetics/kinetics-dataset/k400/val/
+            sample_types:
+                #resize:
+                #    size_h: 224
+                #    size_w: 224
+                fragments:
+                    fragments_h: 7
+                    fragments_w: 7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 32
+            clip_len: 32
+            frame_interval: 2
+            t_frag: 8
+            num_clips: 1
+            
+model:
+    type: DiViDeAddEvaluator
+    args:
+        backbone:
+            fragments:
+                checkpoint: false
+                pretrained: 
+        var: true
+        backbone_size: swin_tiny_grpb
+        backbone_preserve_keys: fragments
+        divide_head: false
+        vqa_head:
+            in_channels: 768
+            out_channels: 400
+            
+optimizer:
+    lr: !!float 1e-3
+    backbone_lr_mult: !!float 1e-1
+    wd: 0.05
+        
+load_path: ../model_baselines/NetArch/swin_tiny_patch244_window877_kinetics400_1k.pth
+test_load_path: ./pretrained_weights/FASTER-VQA-B-AEC_val-livevqc_s_dev_v0.0.pth
+
+    
+        

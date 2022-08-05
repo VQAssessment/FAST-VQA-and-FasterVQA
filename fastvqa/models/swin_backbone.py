@@ -793,6 +793,8 @@ class SwinTransformer3D(nn.Module):
         self.norm = norm_layer(self.num_features)
 
         self._freeze_stages()
+        
+        self.init_weights()
 
     def _freeze_stages(self):
         if self.frozen_stages >= 0:
@@ -808,7 +810,7 @@ class SwinTransformer3D(nn.Module):
                 for param in m.parameters():
                     param.requires_grad = False
 
-    def inflate_weights(self, logger):
+    def inflate_weights(self):
         """Inflate the swin2d parameters to swin3d.
 
         The differences between swin3d and swin2d mainly lie in an extra
@@ -822,6 +824,7 @@ class SwinTransformer3D(nn.Module):
         """
         checkpoint = torch.load(self.pretrained, map_location="cpu")
         state_dict = checkpoint["model"]
+        
 
         # delete relative_position_index since we always re-init it
         relative_position_index_keys = [
@@ -834,6 +837,7 @@ class SwinTransformer3D(nn.Module):
         attn_mask_keys = [k for k in state_dict.keys() if "attn_mask" in k]
         for k in attn_mask_keys:
             del state_dict[k]
+            
 
         state_dict["patch_embed.proj.weight"] = (
             state_dict["patch_embed.proj.weight"]
@@ -854,7 +858,7 @@ class SwinTransformer3D(nn.Module):
             L2 = (2 * self.window_size[1] - 1) * (2 * self.window_size[2] - 1)
             wd = self.window_size[0]
             if nH1 != nH2:
-                logger.warning(f"Error in loading {k}, passing")
+                print(f"Error in loading {k}, passing")
             else:
                 if L1 != L2:
                     S1 = int(L1 ** 0.5)
@@ -878,10 +882,10 @@ class SwinTransformer3D(nn.Module):
             state_dict[k] = relative_position_bias_table_pretrained.repeat(
                 2 * wd - 1, 1
             )
-
+        
         msg = self.load_state_dict(state_dict, strict=False)
-        logger.info(msg)
-        logger.info(f"=> loaded successfully '{self.pretrained}'")
+        print(msg)
+        print(f"=> loaded successfully '{self.pretrained}'")
         del checkpoint
         torch.cuda.empty_cache()
 
@@ -926,7 +930,7 @@ class SwinTransformer3D(nn.Module):
                 L2 = (2 * self.window_size[1] - 1) * (2 * self.window_size[2] - 1)
                 wd = self.window_size[0]
             if nH1 != nH2:
-                logger.warning(f"Error in loading {k}, passing")
+                print(f"Error in loading {k}, passing")
             else:
                 if L1 != L2:
                     S1 = int((L1 / 15) ** 0.5)
@@ -983,12 +987,12 @@ class SwinTransformer3D(nn.Module):
             self.pretrained = pretrained
         if isinstance(self.pretrained, str):
             self.apply(_init_weights)
-            logger = get_root_logger()
-            logger.info(f"load model from: {self.pretrained}")
+            #logger = get_root_logger()
+            #logger.info(f"load model from: {self.pretrained}")
 
             if self.pretrained2d:
                 # Inflate 2D model into 3D model.
-                self.inflate_weights(logger)
+                self.inflate_weights()
             else:
                 # Directly load 3D model.
                 self.load_swin(self.pretrained, strict=False)  # , logger=logger)

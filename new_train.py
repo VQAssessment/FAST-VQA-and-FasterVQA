@@ -95,7 +95,7 @@ sample_types=["resize", "fragments", "crop", "arp_resize", "arp_fragments"]
 
 
 def finetune_epoch(ft_loader, model, model_ema, optimizer, scheduler, device, epoch=-1, 
-                   need_upsampled=False, need_feat=False, need_fused=False, need_separate_sup=True):
+                   need_upsampled=False, need_feat=False, need_fused=False, need_separate_sup=False):
     model.train()
     for i, data in enumerate(tqdm(ft_loader, desc=f"Training in epoch {epoch}")):
         optimizer.zero_grad()
@@ -145,7 +145,7 @@ def finetune_epoch(ft_loader, model, model_ema, optimizer, scheduler, device, ep
         # Plain Supervised Loss
         p_loss, r_loss = plcc_loss(y_pred, y), rank_loss(y_pred, y)
         
-        loss = p_loss + 0.1 * r_loss
+        loss = p_loss + 0.3 * r_loss
         wandb.log(
             {
                 "train/plcc_loss": p_loss.item(),
@@ -279,7 +279,7 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
     k = kendallr(gt_labels, pr_labels)[0]
     r = np.sqrt(((gt_labels - pr_labels) ** 2).mean())
 
-    wandb.log({f"val/SRCC-{suffix}": s, f"val/PLCC-{suffix}": p, f"val/KRCC-{suffix}": k, f"val/RMSE-{suffix}": r})
+    wandb.log({f"val_{suffix}/SRCC-{suffix}": s, f"val_{suffix}/PLCC-{suffix}": p, f"val_{suffix}/KRCC-{suffix}": k, f"val_{suffix}/RMSE-{suffix}": r})
     
     
     if "pr_labels_up" in results[0]:
@@ -291,7 +291,7 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
         upk = kendallr(gt_labels, pr_labels_up)[0]
         upr = np.sqrt(((gt_labels - pr_labels_up) ** 2).mean())
 
-        wandb.log({f"val/up-SRCC-{suffix}": ups, f"val/up-PLCC-{suffix}": upp, f"val/up-KRCC-{suffix}": upk, f"val/up-RMSE-{suffix}": upr})
+        wandb.log({f"val_{suffix}/up-SRCC-{suffix}": ups, f"val_{suffix}/up-PLCC-{suffix}": upp, f"val_{suffix}/up-KRCC-{suffix}": upk, f"val_{suffix}/up-RMSE-{suffix}": upr})
         
     del results, result #, video, video_up
     torch.cuda.empty_cache()
@@ -315,10 +315,10 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
 
     wandb.log(
         {
-            f"val/best_SRCC-{suffix}": best_s,
-            f"val/best_PLCC-{suffix}": best_p,
-            f"val/best_KRCC-{suffix}": best_k,
-            f"val/best_RMSE-{suffix}": best_r,
+            f"val_{suffix}/best_SRCC-{suffix}": best_s,
+            f"val_{suffix}/best_PLCC-{suffix}": best_p,
+            f"val_{suffix}/best_KRCC-{suffix}": best_k,
+            f"val_{suffix}/best_RMSE-{suffix}": best_r,
         }
     )
 
@@ -369,17 +369,30 @@ def main():
                                          seed=opt["split_seed"] * split)
             opt["data"]["train"]["args"]["anno_file"], opt["data"]["val"]["args"]["anno_file"] = split_duo
 
-        train_dataset = getattr(datasets, opt["data"]["train"]["type"])(opt["data"]["train"]["args"])
-        val_dataset = getattr(datasets, opt["data"]["val"]["type"])(opt["data"]["val"]["args"])
+        train_datasets = {}
+        for key in opt["data"]:
+            if key.startswith("train"):
+                train_dataset = getattr(datasets, opt["data"][key]["type"])(opt["data"][key]["args"])
+                train_datasets[key] = train_dataset
+        
+        train_loaders = {}
+        for key, train_dataset in train_datasets.items():
+            train_loaders[key] = torch.utils.data.DataLoader(
+                train_dataset, batch_size=opt["batch_size"], num_workers=opt["num_workers"], shuffle=True,
+            )
+        
+        val_datasets = {}
+        for key in opt["data"]:
+            if key.startswith("val"):
+                val_datasets[key] = getattr(datasets, 
+                                            opt["data"][key]["type"])(opt["data"][key]["args"])
 
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=opt["batch_size"], num_workers=opt["num_workers"], shuffle=True,
-        )
 
-
-        val_loader =  torch.utils.data.DataLoader(
-            val_dataset, batch_size=1, num_workers=opt["num_workers"], pin_memory=True,
-        )
+        val_loaders = {}
+        for key, val_dataset in val_datasets.items():
+            val_loaders[key] = torch.utils.data.DataLoader(
+                val_dataset, batch_size=1, num_workers=opt["num_workers"], pin_memory=True,
+            )
 
 
         run = wandb.init(
@@ -409,9 +422,10 @@ def main():
             for key, value in t_state_dict.items():
                 if key in i_state_dict and i_state_dict[key].shape != value.shape:
                     i_state_dict.pop(key)
+            
             model.load_state_dict(i_state_dict, strict=False)
-
-        print(model)
+            
+        #print(model)
 
         if opt["ema"]:
             from copy import deepcopy
@@ -422,7 +436,6 @@ def main():
         #profile_inference(val_dataset, model, device)    
 
         # finetune the model
-        print(len(val_loader), len(train_loader))
 
 
         param_groups=[]
@@ -436,8 +449,9 @@ def main():
         optimizer = torch.optim.AdamW(lr=opt["optimizer"]["lr"], params=param_groups,
                                       weight_decay=opt["optimizer"]["wd"],
                                      )
-
-        warmup_iter = int(opt["warmup_epochs"] * len(train_loader))
+        warmup_iter = 0
+        for train_loader in train_loaders.values():
+            warmup_iter += int(opt["warmup_epochs"] * len(train_loader))
         max_iter = int((opt["num_epochs"] + opt["l_num_epochs"]) * len(train_loader))
         lr_lambda = (
             lambda cur_iter: cur_iter / warmup_iter
@@ -449,8 +463,12 @@ def main():
             optimizer, lr_lambda=lr_lambda,
         )
 
-        best_ = -1, -1, -1, 1000
-        best_n = best_
+        bests = {}
+        bests_n = {}
+        for key in val_loaders:
+            bests[key] = -1,-1,-1,1000
+            bests_n[key] = -1,-1,-1,1000
+        
 
         for key, value in dict(model.named_children()).items():
             if "backbone" in key:
@@ -459,98 +477,108 @@ def main():
 
         for epoch in range(opt["l_num_epochs"]):
             print(f"Linear Epoch {epoch}:")
-            finetune_epoch(
-                train_loader, model, model_ema, optimizer, scheduler, device, epoch,
-                opt.get("need_upsampled", False), opt.get("need_feat", False), opt.get("need_fused", False),
-            )
-            best_ = inference_set(
-                val_loader,
-                model_ema if model_ema is not None else model,
-                device, best_, save_model=opt["save_model"], save_name=opt["name"],
-            )
-            if model_ema is not None:
-                best_n = inference_set(
-                    val_loader,
-                    model,
-                    device, best_n, save_model=opt["save_model"], save_name=opt["name"],
-                    suffix = 'n',
+            for key, train_loader in train_loaders.items():
+                finetune_epoch(
+                    train_loader, model, model_ema, optimizer, scheduler, device, epoch,
+                    opt.get("need_upsampled", False), opt.get("need_feat", False), opt.get("need_fused", False),
                 )
-            else:
-                best_n = best_
+            for key in val_loaders:
+                bests[key] = inference_set(
+                    val_loaders[key],
+                    model_ema if model_ema is not None else model,
+                    device, bests[key], save_model=opt["save_model"], save_name=opt["name"],
+                    suffix = key+"_s",
+                )
+                if model_ema is not None:
+                    bests_n[key] = inference_set(
+                        val_loaders[key],
+                        model,
+                        device, bests_n[key], save_model=opt["save_model"], save_name=opt["name"],
+                        suffix = key+'_n',
+                    )
+                else:
+                    bests_n[key] = bests[key]
 
-        if opt["l_num_epochs"] > 0:
-            print(
-                f"""For the linear transfer process on with {len(val_loader)} videos,
-                the best validation accuracy of the model-s is as follows:
-                SROCC: {best_[0]:.4f}
-                PLCC:  {best_[1]:.4f}
-                KROCC: {best_[2]:.4f}
-                RMSE:  {best_[3]:.4f}."""
-            )
+        if opt["l_num_epochs"] >= 0:
+            for key in val_loaders:
+                print(
+                    f"""For the linear transfer process on {key} with {len(val_loaders[key])} videos,
+                    the best validation accuracy of the model-s is as follows:
+                    SROCC: {bests[key][0]:.4f}
+                    PLCC:  {bests[key][1]:.4f}
+                    KROCC: {bests[key][2]:.4f}
+                    RMSE:  {bests[key][3]:.4f}."""
+                )
 
-            print(
-                f"""For the linear transfer process on with {len(val_loader)} videos,
-                the best validation accuracy of the model-n is as follows:
-                SROCC: {best_n[0]:.4f}
-                PLCC:  {best_n[1]:.4f}
-                KROCC: {best_n[2]:.4f}
-                RMSE:  {best_n[3]:.4f}."""
-            )
+                print(
+                    f"""For the linear transfer process on {key} with {len(val_loaders[key])} videos,
+                    the best validation accuracy of the model-n is as follows:
+                    SROCC: {bests_n[key][0]:.4f}
+                    PLCC:  {bests_n[key][1]:.4f}
+                    KROCC: {bests_n[key][2]:.4f}
+                    RMSE:  {bests_n[key][3]:.4f}."""
+                )
 
         for key, value in dict(model.named_children()).items():
             if "backbone" in key:
                 for param in value.parameters():
                     param.requires_grad = True
                     
-        types = opt["data"]["train"]["args"]["sample_types"]
         
 
-        best_ = inference_set(
-            val_loader,
-            model_ema if model_ema is not None else model,
-            device, best_, save_model=False, save_name=opt["name"],
-        )
+        #best_ = inference_set(
+        #    val_loader,
+        #    model_ema if model_ema is not None else model,
+        #    device, best_, save_model=False, save_name=opt["name"],
+        #)
         
         for epoch in range(opt["num_epochs"]):
             print(f"Finetune Epoch {epoch}:")
 
-            finetune_epoch(
-                train_loader, model, model_ema, optimizer, scheduler, device, epoch,
-                opt.get("need_upsampled", False), opt.get("need_feat", False),  opt.get("need_fused", False),
-            )
-            best_ = inference_set(
-                val_loader,
-                model_ema if model_ema is not None else model,
-                device, best_, save_model=opt["save_model"], save_name=opt["name"],
-            )
-            if model_ema is not None:
-                best_n = inference_set(
-                    val_loader,
-                    model,
-                    device, best_n, save_model=opt["save_model"],
-                    suffix='n', save_name=opt["name"],
+
+
+            for key, train_loader in train_loaders.items():
+                finetune_epoch(
+                    train_loader, model, model_ema, optimizer, scheduler, device, epoch,
+                    opt.get("need_upsampled", False), opt.get("need_feat", False), opt.get("need_fused", False),
                 )
-            else:
-                best_n = best_
+            for key in val_loaders:
+                bests[key] = inference_set(
+                    val_loaders[key],
+                    model_ema if model_ema is not None else model,
+                    device, bests[key], save_model=opt["save_model"], save_name=opt["name"],
+                    suffix=key+"_s",
+                )
+                if model_ema is not None:
+                    bests_n[key] = inference_set(
+                        val_loaders[key],
+                        model,
+                        device, bests_n[key], save_model=opt["save_model"], save_name=opt["name"],
+                        suffix = key+'_n',
+                    )
+                else:
+                    bests_n[key] = bests[key]
+                    
+        if opt["num_epochs"] > 0:
+            for key in val_loaders:
+                print(
+                    f"""For the finetuning process on {key} with {len(val_loaders[key])} videos,
+                    the best validation accuracy of the model-s is as follows:
+                    SROCC: {bests[key][0]:.4f}
+                    PLCC:  {bests[key][1]:.4f}
+                    KROCC: {bests[key][2]:.4f}
+                    RMSE:  {bests[key][3]:.4f}."""
+                )
 
-        print(
-            f"""For the fintuning process on with {len(val_loader)} videos,
-            the best validation accuracy of the model-s is as follows:
-            SROCC: {best_[0]:.4f}
-            PLCC:  {best_[1]:.4f}
-            KROCC: {best_[2]:.4f}
-            RMSE:  {best_[3]:.4f}."""
-        )
-
-        print(
-            f"""For the linear transfer process on with {len(val_loader)} videos,
-            the best validation accuracy of the model-n is as follows:
-            SROCC: {best_n[0]:.4f}
-            PLCC:  {best_n[1]:.4f}
-            KROCC: {best_n[2]:.4f}
-            RMSE:  {best_n[3]:.4f}."""
-        )
-
+                print(
+                    f"""For the finetuning process on {key} with {len(val_loaders[key])} videos,
+                    the best validation accuracy of the model-n is as follows:
+                    SROCC: {bests_n[key][0]:.4f}
+                    PLCC:  {bests_n[key][1]:.4f}
+                    KROCC: {bests_n[key][2]:.4f}
+                    RMSE:  {bests_n[key][3]:.4f}."""
+                )
+            
         run.finish()
     
     

@@ -1,4 +1,4 @@
-name: FAST-VQA-with-Conv-Backbone-Resize
+name: FAST-VQA-with-Conv-Backbone-Resize-S
 
 num_epochs: 30
 l_num_epochs: 0
@@ -46,7 +46,10 @@ data:
 model:
     type: DiViDeAddEvaluator
     args:
+        backbone:
+            pretrained: false
         backbone_size: conv_tiny
+        backbone_preserve_keys: resize
         divide_head: true # if true, different branches will not share head
         vqa_head:
             in_channels: 768
@@ -57,7 +60,7 @@ optimizer:
     backbone_lr_mult: !!float 1e-1
     wd: 0.05
         
-test_load_path: ./pretrained_weights/FAST-VQA-with-Conv-Backbone_s_dev_v0.0.pth
+test_load_path: ./pretrained_weights/FAST-VQA-with-Conv-Backbone-Resize_s_dev_v0.0.pth
 
 
 

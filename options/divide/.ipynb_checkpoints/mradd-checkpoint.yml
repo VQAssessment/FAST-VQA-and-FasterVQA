@@ -1,4 +1,4 @@
-name: DiViDe-MRSSSL-DivideHead-BiLearn-8P
+name: DiViDe-MRSSSL-DivideHead-NOUP
 
 num_epochs: 30
 l_num_epochs: 0
@@ -8,7 +8,7 @@ save_model: true
 batch_size: 16
 num_workers: 6
 
-need_upsampled: true
+need_upsampled: false
 need_feat: true
 need_fused: false
 
@@ -24,15 +24,15 @@ data:
             anno_file: ./examplar_data_labels/train_labels.txt
             data_prefix: ../datasets/LSVQ
             sample_types:
-                fragments_up:
-                    fragments_h: 8
-                    fragments_w: 8
-                    fsize_h: 32
-                    fsize_w: 32
-                    aligned: 32
-                resize_up:
-                    size_h: 256
-                    size_w: 256
+                #fragments_up:
+                #    fragments_h: 8
+                #    fragments_w: 8
+                #    fsize_h: 32
+                #    fsize_w: 32
+                #    aligned: 32
+                #resize_up:
+                #    size_h: 256
+                #    size_w: 256
                 fragments:
                     fragments_h: 8
                     fragments_w: 8

@@ -9,10 +9,12 @@ from .basic_datasets import (
     CroppedImageDataset,
     get_spatial_fragments,
     SampleFrames,
+    FragmentSampleFrames,
 )
 
 ## Version 1.0 Dataset API, includes DiViDe VQA and its variants
-from .fusion_datasets import SimpleDataset, FusionDataset
+from .fusion_datasets import SimpleDataset, FusionDataset,  LSVQPatchDataset, FusionDatasetK400
+
 
 __all__ = [
     "FragmentVideoDataset",
@@ -21,8 +23,11 @@ __all__ = [
     "ResizedImageDataset",
     "CroppedVideoDataset",
     "CroppedImageDataset",
+    "LSVQPatchDataset",
     "get_spatial_fragments",
     "SampleFrames",
+    "FragmentSampleFrames",
     "SimpleDataset",
+    "FusionDatasetK400",
     "FusionDataset",
 ]

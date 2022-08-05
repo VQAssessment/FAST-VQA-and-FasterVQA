@@ -38,7 +38,7 @@ def profile_inference(inf_set, model, device):
         if key in data:
             video[key] = data[key].to(device)
             c, t, h, w = video[key].shape
-            video[key] = video[key].reshape(b, c, data["num_clips"], t // data["num_clips"], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"], c, t // data["num_clips"], h, w) 
+            video[key] = video[key].reshape(1, c, data["num_clips"], t // data["num_clips"], h, w).permute(0,2,1,3,4,5).reshape( data["num_clips"], c, t // data["num_clips"], h, w) 
     with torch.no_grad():
         flops, params = profile(model, (video, ))
     print(f"The FLOps of the Variant is {flops/1e9:.1f}G, with Params {params/1e6:.2f}M.")
@@ -80,16 +80,6 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
 
     wandb.log({f"val/SRCC-{suffix}": s, f"val/PLCC-{suffix}": p, f"val/KRCC-{suffix}": k, f"val/RMSE-{suffix}": r})
 
-    if s + p > best_s + best_p and save_model:
-        state_dict = model.state_dict()
-        torch.save(
-            {
-                "state_dict": state_dict,
-                "validation_results": best_,
-            },
-            f"pretrained_weights/224-divide_{suffix}_dev_v0.0.pth",
-        )
-
     best_s, best_p, best_k, best_r = (
         max(best_s, s),
         max(best_p, p),
@@ -110,16 +100,13 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
         f"For {len(inf_loader)} videos, \nthe accuracy of the model: [{suffix}] is as follows:\n  SROCC: {s:.4f} best: {best_s:.4f} \n  PLCC:  {p:.4f} best: {best_p:.4f}  \n  KROCC: {k:.4f} best: {best_k:.4f} \n  RMSE:  {r:.4f} best: {best_r:.4f}."
     )
 
-    return best_s, best_p, best_k, best_r
-
-    # torch.save(results, f'{args.save_dir}/results_{dataset.lower()}_s{32}*{32}_ens{args.famount}.pkl')
-
+    return best_s, best_p, best_k, best_r, pr_labels
 
 def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-o", "--opt", type=str, default="./options/divide/testmr.yml", help="the option file"
+        "-o", "--opt", type=str, default="./options/fast/fast-b.yml", help="the option file"
     )
 
     args = parser.parse_args()
@@ -141,26 +128,9 @@ def main():
     model = getattr(models, opt["model"]["type"])(**opt["model"]["args"]).to(device)
 
     state_dict = torch.load(opt["test_load_path"], map_location=device)["state_dict"]
-            ### migrate training weights from mmaction
-    from collections import OrderedDict
 
-    i_state_dict = OrderedDict()
-    for key in state_dict.keys():
-        if "cls" in key:
-            tkey = key.replace("cls", "vqa")
-            i_state_dict[tkey] = state_dict[key]
-        elif "backbone" in key and "_backbone" not in key:
-            i_state_dict["fragments_"+key] = state_dict[key]
-            #i_state_dict["resize_"+key] = state_dict[key]
-        else:
-            i_state_dict[key] = state_dict[key]
-    t_state_dict = model.state_dict()
-    for key, value in t_state_dict.items():
-        if key in i_state_dict and i_state_dict[key].shape != value.shape:
-            i_state_dict.pop(key)
-    model.load_state_dict(i_state_dict, strict=True)
+    model.load_state_dict(state_dict, strict=True)
     
-    print(model)
     
     for key in opt["data"].keys():
         
@@ -182,7 +152,7 @@ def main():
 
 
 
-        profile_inference(val_dataset, model, device)    
+        #profile_inference(val_dataset, model, device)    
 
         # finetune the model
         print(len(val_loader))
@@ -203,6 +173,10 @@ def main():
             KROCC: {best_[2]:.4f}
             RMSE:  {best_[3]:.4f}."""
         )
+        
+        with open("results/"+opt["name"]+"_Test_"+key+".txt", "w") as f:
+            for label in best_[-1]:
+                f.write(f"{label}\n")
 
         run.finish()
 

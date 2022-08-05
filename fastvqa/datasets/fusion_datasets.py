@@ -1,11 +1,13 @@
 import decord
 from decord import VideoReader
 from decord import cpu, gpu
+import glob
 import os.path as osp
 import numpy as np
 import torch, torchvision
 from tqdm import tqdm
 import cv2
+
 
 import random
 import copy
@@ -27,11 +29,12 @@ def get_spatial_fragments(
     aligned=32,
     nfrags=1,
     random=False,
+    random_upsample=False,
     fallback_type="upsample",
 ):
     size_h = fragments_h * fsize_h
     size_w = fragments_w * fsize_w
-
+    ## video: [C,T,H,W]
     ## situation for images
     if video.shape[1] == 1:
         aligned = 1
@@ -39,12 +42,22 @@ def get_spatial_fragments(
     dur_t, res_h, res_w = video.shape[-3:]
     ratio = min(res_h / size_h, res_w / size_w)
     if fallback_type == "upsample" and ratio < 1:
-
+        
         ovideo = video
         video = torch.nn.functional.interpolate(
             video / 255.0, scale_factor=1 / ratio, mode="bilinear"
         )
         video = (video * 255.0).type_as(ovideo)
+        
+    if random_upsample:
+
+        randratio = random.random() * 0.5 + 1
+        video = torch.nn.functional.interpolate(
+            video / 255.0, scale_factor=randratio, mode="bilinear"
+        )
+        video = (video * 255.0).type_as(ovideo)
+
+
 
     assert dur_t % aligned == 0, "Please provide match vclip and align index"
     size = size_h, size_w
@@ -203,14 +216,23 @@ def get_single_sample(
 
 def get_spatial_samples(
     video,
-    random_crop=False,
+    random_crop=0, ## 1: ARP-kept Crop; 2: Square-like Crop
     sample_types={"resize": {}, "fragments": {}}, ## resize | arp_resize | crop | fragments
 ):
-    if random_crop:
+    if random_crop == 1:
         ## Random Crop but keep the ARP
         res_h, res_w = video.shape[-2:]
         rnd_ratio = random.random() * 0.2 + 0.8
         new_h, new_w = int(rnd_ratio * res_h), int(rnd_ratio * res_w)
+        rnd_h = random.randrange(res_h - new_h)
+        rnd_w = random.randrange(res_w - new_w)
+        video = video[..., rnd_h:rnd_h+new_h, rnd_w:rnd_w+new_w]
+        
+    if random_crop == 2:
+        ## Random Crop into a Size similar to Square
+        rnd_ratio = random.random() * 0.2 + 0.8
+        res_h, res_w = video.shape[-2:]
+        new_h = new_w = int(rnd_ratio * min(res_h, res_w))
         rnd_h = random.randrange(res_h - new_h)
         rnd_w = random.randrange(res_w - new_w)
         video = video[..., rnd_h:rnd_h+new_h, rnd_w:rnd_w+new_w]
@@ -305,7 +327,57 @@ class SampleFrames:
         frame_inds = np.concatenate(frame_inds) + start_index
         return frame_inds.astype(np.int32)
     
+import numpy as np
+import random
 
+class FragmentSampleFrames:
+    def __init__(self, fsize_t, fragments_t, frame_interval=1, num_clips=1, drop_rate=0., ):
+
+        self.fragments_t = fragments_t
+        self.fsize_t = fsize_t
+        self.size_t = fragments_t * fsize_t
+        self.frame_interval = frame_interval
+        self.num_clips = num_clips
+        self.drop_rate = drop_rate
+
+    def get_frame_indices(self, num_frames, train=False):
+
+        tgrids = np.array(
+            [num_frames // self.fragments_t * i for i in range(self.fragments_t)],
+            dtype=np.int32,
+        )
+        tlength = num_frames // self.fragments_t
+
+        if tlength > self.fsize_t * self.frame_interval:
+            rnd_t = np.random.randint(
+                0, tlength - self.fsize_t * self.frame_interval, size=len(tgrids)
+            )
+        else:
+            rnd_t = np.zeros(len(tgrids), dtype=np.int32)
+        
+        ranges_t = (
+            np.arange(self.fsize_t)[None, :] * self.frame_interval
+            + rnd_t[:, None]
+            + tgrids[:, None]
+        )
+        
+        
+        drop = random.sample(list(range(self.fragments_t)), int(self.fragments_t * self.drop_rate))
+        dropped_ranges_t = []
+        for i, rt in enumerate(ranges_t):
+            if i not in drop:
+                dropped_ranges_t.append(rt)
+        return np.concatenate(dropped_ranges_t)
+
+    def __call__(self, total_frames, train=False, start_index=0):
+        frame_inds = []
+
+        for i in range(self.num_clips):
+            frame_inds += [self.get_frame_indices(total_frames)]
+            
+        frame_inds = np.concatenate(frame_inds)
+        frame_inds = np.mod(frame_inds + start_index, total_frames)
+        return frame_inds.astype(np.int32)
 
 class SimpleDataset(torch.utils.data.Dataset):
     def __init__(self, opt):
@@ -386,19 +458,31 @@ class FusionDataset(torch.utils.data.Dataset):
         self.crop = opt.get("random_crop", False)
         self.mean = torch.FloatTensor([123.675, 116.28, 103.53])
         self.std = torch.FloatTensor([58.395, 57.12, 57.375])
-        self.sampler = SampleFrames(opt["clip_len"], opt["frame_interval"], opt["num_clips"])
+        if "t_frag" not in opt:
+            self.sampler = SampleFrames(opt["clip_len"], opt["frame_interval"], opt["num_clips"])
+        else:
+            self.sampler = FragmentSampleFrames(opt["clip_len"] // opt["t_frag"], opt["t_frag"], opt["frame_interval"], opt["num_clips"])
+        print(self.sampler(240, self.phase == "train"))
         
         if isinstance(self.ann_file, list):
             self.video_infos = self.ann_file
         else:
-            with open(self.ann_file, "r") as fin:
-                for line in fin:
-                    line_split = line.strip().split(",")
-                    filename, _, _, label = line_split
-                    label = float(label)
-                    filename = osp.join(self.data_prefix, filename)
-                    self.video_infos.append(dict(filename=filename, label=label))
-                    
+            try:
+                with open(self.ann_file, "r") as fin:
+                    for line in fin:
+                        line_split = line.strip().split(",")
+                        filename, _, _, label = line_split
+                        label = float(label)
+                        filename = osp.join(self.data_prefix, filename)
+                        self.video_infos.append(dict(filename=filename, label=label))
+            except:
+                #### No Label Testing
+                video_filenames = sorted(glob.glob(self.data_prefix+"/*.mp4"))
+                print(video_filenames)
+                for filename in video_filenames:
+                    self.video_infos.append(dict(filename=filename, label=-1))
+
+
     def refresh_hypers(self):
         if not hasattr(self, "initial_sample_types"):
             self.initial_sample_types = copy.deepcopy(self.sample_types)
@@ -460,6 +544,208 @@ class FusionDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.video_infos)
     
+class FusionDatasetK400(torch.utils.data.Dataset):
+    def __init__(self, opt):
+        ## opt is a dictionary that includes options for video sampling
+        
+        super().__init__()
+        
+        self.video_infos = []
+        self.ann_file = opt["anno_file"]
+        self.data_prefix = opt["data_prefix"]
+        self.opt = opt
+        self.sample_types = opt["sample_types"]
+        self.data_backend = opt.get("data_backend", "disk")
+        if self.data_backend == "petrel":
+            from petrel_client import client
+            self.client = client.Client(enable_mc=True)
+        
+        self.phase = opt["phase"]
+        self.crop = opt.get("random_crop", False)
+        self.mean = torch.FloatTensor([123.675, 116.28, 103.53])
+        self.std = torch.FloatTensor([58.395, 57.12, 57.375])
+        if "t_frag" not in opt:
+            self.sampler = SampleFrames(opt["clip_len"], opt["frame_interval"], opt["num_clips"])
+        else:
+            self.sampler = FragmentSampleFrames(opt["clip_len"] // opt["t_frag"], opt["t_frag"], opt["frame_interval"], opt["num_clips"])
+        print(self.sampler(240, self.phase == "train"))
+        
+        if isinstance(self.ann_file, list):
+            self.video_infos = self.ann_file
+        else:
+            try:
+                print(self.ann_file)
+                with open(self.ann_file, "r") as fin:
+                    for line in fin:
+                        line_split = line.strip().split(",")
+                        filename, _, _, label = line_split
+                        label = int(label)
+                        filename = osp.join(self.data_prefix, filename)
+                        self.video_infos.append(dict(filename=filename, label=label))
+            except:
+                #### No Label Testing
+                video_filenames = sorted(glob.glob(self.data_prefix+"/*.mp4"))
+                print(video_filenames)
+                for filename in video_filenames:
+                    self.video_infos.append(dict(filename=filename, label=-1))
+
+
+    def refresh_hypers(self):
+        if not hasattr(self, "initial_sample_types"):
+            self.initial_sample_types = copy.deepcopy(self.sample_types)
+        
+        types = self.sample_types
+        
+        if "fragments_up" in types:
+            ubh, ubw = self.initial_sample_types["fragments_up"]["fragments_h"] + 1, self.initial_sample_types["fragments_up"]["fragments_w"] + 1
+            lbh, lbw = self.initial_sample_types["fragments"]["fragments_h"] + 1, self.initial_sample_types["fragments"]["fragments_w"] + 1
+            dh, dw = types["fragments_up"]["fragments_h"], types["fragments_up"]["fragments_w"]
+
+            types["fragments_up"]["fragments_h"] = random.randrange(max(lbh, dh-1), min(ubh, dh+2))
+            types["fragments_up"]["fragments_w"] = random.randrange(max(lbw, dw-1), min(ubw, dw+2))
+            
+        if "resize_up" in types:
+        
+            types["resize_up"]["size_h"] = types["fragments_up"]["fragments_h"] * types["fragments_up"]["fsize_h"]
+            types["resize_up"]["size_w"] = types["fragments_up"]["fragments_w"] * types["fragments_up"]["fsize_w"]
+        
+        self.sample_types.update(types)
+
+        #print("Refreshed sample hyper-paremeters:", self.sample_types)
+
+        
+    def __getitem__(self, index):
+        video_info = self.video_infos[index]
+        filename = video_info["filename"]
+        label = video_info["label"]
+        
+
+        ## Read Original Frames
+        if filename.endswith(".yuv"):
+            ## This is only an adaptation to LIVE-Qualcomm
+            video = skvideo.io.vread(filename, 1080, 1920, inputdict={'-pix_fmt':'yuvj420p'})
+            frame_inds = self.sampler(video.shape[0], self.phase == "train")
+            imgs = [torch.from_numpy(video[idx]) for idx in frame_inds]
+        else:
+            vreader = VideoReader(filename)
+            frame_inds = self.sampler(len(vreader), self.phase == "train")
+            frame_dict = {idx: vreader[idx] for idx in np.unique(frame_inds)}
+            imgs = [frame_dict[idx] for idx in frame_inds]
+        img_shape = imgs[0].shape
+        video = torch.stack(imgs, 0)
+        video = video.permute(3, 0, 1, 2)
+        ## Process Frames
+        data = get_spatial_samples(video,
+                                   self.crop,
+                                   self.sample_types,
+                                  )
+        for k, v in data.items():
+            data[k] = ((v.permute(1, 2, 3, 0) - self.mean) / self.std).permute(3, 0, 1, 2)
+        data["num_clips"] =  self.opt["num_clips"]
+        data["frame_inds"] = frame_inds
+        data["gt_label"] = label
+        data["name"] = osp.basename(video_info["filename"])
+        
+        return data
+    
+    def __len__(self):
+        return len(self.video_infos)
+    
+class LSVQPatchDataset(torch.utils.data.Dataset):
+    def __init__(self, opt):
+        ## opt is a dictionary that includes options for video sampling
+        
+        super().__init__()
+        
+        self.video_infos = []
+        self.ann_file = opt["anno_file"]
+        self.data_prefix = opt["data_prefix"]
+        self.opt = opt
+        self.sample_types = opt["sample_types"]
+        self.data_backend = opt.get("data_backend", "disk")
+        if self.data_backend == "petrel":
+            from petrel_client import client
+            self.client = client.Client(enable_mc=True)
+        
+        self.phase = opt["phase"]
+        self.crop = opt.get("random_crop", False)
+        self.mean = torch.FloatTensor([123.675, 116.28, 103.53])
+        self.std = torch.FloatTensor([58.395, 57.12, 57.375])
+        if "t_frag" not in opt:
+            self.sampler = SampleFrames(opt["clip_len"], opt["frame_interval"], opt["num_clips"])
+        else:
+            self.sampler = FragmentSampleFrames(opt["clip_len"] // opt["t_frag"], opt["t_frag"], opt["frame_interval"], opt["num_clips"])
+        print(self.sampler(240, self.phase == "train"))
+        
+        if isinstance(self.ann_file, list):
+            self.video_infos = self.ann_file
+        else:
+            with open(self.ann_file, "r") as fin:
+                for line in fin:
+                    line_split = line.strip().split(",")
+                    filename, _, _, label, coords, _ = line_split
+                    coords = [int(e) for e in coords[2:-1].split(";")]
+                    label = float(label)
+                    filename = osp.join(self.data_prefix, filename)
+                    self.video_infos.append(dict(filename=filename, label=label, coords=coords))
+
+
+    def refresh_hypers(self):
+        if not hasattr(self, "initial_sample_types"):
+            self.initial_sample_types = copy.deepcopy(self.sample_types)
+        
+        types = self.sample_types
+        
+        if "fragments_up" in types:
+            ubh, ubw = self.initial_sample_types["fragments_up"]["fragments_h"] + 1, self.initial_sample_types["fragments_up"]["fragments_w"] + 1
+            lbh, lbw = self.initial_sample_types["fragments"]["fragments_h"] + 1, self.initial_sample_types["fragments"]["fragments_w"] + 1
+            dh, dw = types["fragments_up"]["fragments_h"], types["fragments_up"]["fragments_w"]
+
+            types["fragments_up"]["fragments_h"] = random.randrange(max(lbh, dh-1), min(ubh, dh+2))
+            types["fragments_up"]["fragments_w"] = random.randrange(max(lbw, dw-1), min(ubw, dw+2))
+            
+        if "resize_up" in types:
+        
+            types["resize_up"]["size_h"] = types["fragments_up"]["fragments_h"] * types["fragments_up"]["fsize_h"]
+            types["resize_up"]["size_w"] = types["fragments_up"]["fragments_w"] * types["fragments_up"]["fsize_w"]
+        
+        self.sample_types.update(types)
+
+        #print("Refreshed sample hyper-paremeters:", self.sample_types)
+
+        
+    def __getitem__(self, index):
+        video_info = self.video_infos[index]
+        filename = video_info["filename"]
+        label = video_info["label"]
+        x0, x1, y0, y1, ts, tt = video_info["coords"]
+        
+        
+
+        ## Read Original Frames
+        vreader = VideoReader(filename)
+        frame_inds = self.sampler(min(len(vreader), tt-ts), self.phase == "train") + ts
+        frame_dict = {idx: vreader[idx] for idx in np.unique(frame_inds)}
+        imgs = [frame_dict[idx][y0:y1,x0:x1] for idx in frame_inds]
+        img_shape = imgs[0].shape
+        video = torch.stack(imgs, 0)
+        video = video.permute(3, 0, 1, 2)
+        ## Process Frames
+        data = get_spatial_samples(video,
+                                   self.crop,
+                                   self.sample_types,
+                                  )
+        for k, v in data.items():
+            data[k] = ((v.permute(1, 2, 3, 0) - self.mean) / self.std).permute(3, 0, 1, 2)
+        data["num_clips"] =  self.opt["num_clips"]
+        data["frame_inds"] = frame_inds
+        data["gt_label"] = label
+        data["name"] = osp.basename(video_info["filename"])
+        
+        return data
+    
+    def __len__(self):
+        return len(self.video_infos)
     
 if __name__ == "__main__":
     train_opt = {

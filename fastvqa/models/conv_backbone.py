@@ -227,6 +227,9 @@ class ConvNeXt3D(nn.Module):
         t_state_dict = self.state_dict()
         from collections import OrderedDict
         for key in t_state_dict.keys():
+            if key not in s_state_dict:
+                print(key)
+                continue
             if t_state_dict[key].shape != s_state_dict[key].shape:
                 t = t_state_dict[key].shape[2]
                 s_state_dict[key] = s_state_dict[key].unsqueeze(2).repeat(1,1,t,1,1) / t
@@ -237,16 +240,24 @@ class ConvNeXt3D(nn.Module):
             trunc_normal_(m.weight, std=.02)
             nn.init.constant_(m.bias, 0)
 
-    def forward_features(self, x, return_spatial=False):
+    def forward_features(self, x, return_spatial=False, multi=False):
+        if multi:
+            xs = []
         for i in range(4):
             x = self.downsample_layers[i](x)
             x = self.stages[i](x)
+            if multi:
+                xs.append(x)
         if return_spatial:
-            return self.norm(x.permute(0, 2, 3, 4, 1)).permute(0, 4, 1, 2, 3)
+            if multi:
+                shape = xs[-1].shape[2:]
+                return torch.cat([F.interpolate(x,size=shape, mode="trilinear") for x in xs[:-1]] + [self.norm(x.permute(0, 2, 3, 4, 1)).permute(0, 4, 1, 2, 3)], 1)
+            else:
+                return self.norm(x.permute(0, 2, 3, 4, 1)).permute(0, 4, 1, 2, 3)
         return self.norm(x.mean([-3, -2, -1])) # global average pooling, (N, C, T, H, W) -> (N, C)
 
-    def forward(self, x):
-        x = self.forward_features(x, True)
+    def forward(self, x, multi=False):
+        x = self.forward_features(x, True, multi=multi)
         return x
 
 
@@ -313,9 +324,9 @@ def convnext_3d_tiny(pretrained=False, in_22k=False, **kwargs):
     return model
 
 def convnext_3d_small(pretrained=False, in_22k=False, **kwargs):
-    model = ConvNeXt(depths=[3, 3, 27, 3], dims=[96, 192, 384, 768], **kwargs)
+    model = ConvNeXt3D(depths=[3, 3, 27, 3], dims=[96, 192, 384, 768], **kwargs)
     if pretrained:
-        url = model_urls['convnext_tiny_22k'] if in_22k else model_urls['convnext_tiny_1k']
+        url = model_urls['convnext_small_22k'] if in_22k else model_urls['convnext_small_1k']
         checkpoint = torch.hub.load_state_dict_from_url(url=url, map_location="cpu", check_hash=True)
         model.inflate_weights(checkpoint["model"])
     return model

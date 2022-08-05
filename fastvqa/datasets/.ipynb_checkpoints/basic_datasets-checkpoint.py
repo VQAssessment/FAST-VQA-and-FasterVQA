@@ -301,7 +301,7 @@ class FastVQAPlusPlusDataset(torch.utils.data.Dataset):
             filename = video_info["filename"]
             label = video_info["label"]
             if filename.endswith(".yuv"):
-                video = skvideo.io.vread(filename, 432, 768, inputdict={'-pix_fmt':'yuvj420p'})
+                video = skvideo.io.vread(filename, 1080, 1920, inputdict={'-pix_fmt':'yuvj420p'})
                 frame_inds = self.sampler(video.shape[0], self.phase == "train")
                 imgs = [torch.from_numpy(video[idx]) for idx in frame_inds]
             else:
@@ -444,7 +444,7 @@ class FragmentVideoDataset(torch.utils.data.Dataset):
             filename = video_info["filename"]
             label = video_info["label"]
             if filename.endswith(".yuv"):
-                video = skvideo.io.vread(filename, 432, 768, inputdict={'-pix_fmt':'yuvj420p'})
+                video = skvideo.io.vread(filename, 1080, 1920, inputdict={'-pix_fmt':'yuvj420p'})
                 frame_inds = self.sampler(video.shape[0], self.phase == "train")
                 imgs = [torch.from_numpy(video[idx]) for idx in frame_inds]
             else:

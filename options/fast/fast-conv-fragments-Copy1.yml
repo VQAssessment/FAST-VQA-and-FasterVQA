@@ -1,0 +1,81 @@
+name: FAST-VQA-with-Conv-Backbone-Fragments-MultiLevel
+
+num_epochs: 60
+l_num_epochs: 10
+warmup_epochs: 2.5
+ema: true
+save_model: true
+batch_size: 16
+num_workers: 6
+
+need_upsampled: false
+need_feat: false
+need_fused: false
+
+wandb:
+    project_name: VQA_Experiments_2022
+
+data:
+    train:
+        type: FusionDataset
+        args:
+            phase: train
+            random_crop: false
+            #anno_file: ./examplar_data_labels/train_labels.txt
+            #data_prefix: ../datasets/LSVQ
+            anno_file: ./examplar_data_labels/mgtv_training.txt
+            data_prefix: ../mgtv_vqa/MGTV_VQA_DATA/1.MGTV_OGC_V1_dataset/training
+
+            sample_types:
+                fragments:
+                    fragments_h: 7
+                    fragments_w: 7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+            clip_len: 16
+            frame_interval: 4
+            num_clips: 1
+    val:
+        type: FusionDataset
+        args:
+            phase: test
+            #anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
+            #data_prefix: ../datasets/LIVE_VQC
+            anno_file: ./examplar_data_labels/mgtv_validation.txt
+            data_prefix: ../mgtv_vqa/MGTV_VQA_DATA/1.MGTV_OGC_V1_dataset/validation
+            sample_types:
+                fragments:
+                    fragments_h: 7
+                    fragments_w: 7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 16
+            clip_len: 16
+            frame_interval: 4
+            num_clips: 2
+model:
+    type: DiViDeAddEvaluator
+    args:
+        backbone_size: conv_tiny
+        multi: true
+        backbone_preserve_keys: fragments
+        divide_head: true # if true, different branches will not share head
+        vqa_head:
+            in_channels: 1440
+            hidden_channels: 64
+            
+optimizer:
+    lr: !!float 1e-3
+    backbone_lr_mult: !!float 1e-1
+    wd: 0.05
+
+#load_path: ./pretrained_weights/FAST-VQA-with-Conv-Backbone_s_dev_v0.0.pth
+test_load_path: ./pretrained_weights/FAST-VQA-with-Conv-Backbone-Fragments-SN_n_dev_v0.0.pth
+
+
+
+
+    
+        
+
