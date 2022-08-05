@@ -244,6 +244,30 @@ def main():
     
     model = getattr(models, opt["model"]["type"])(**opt["model"]["args"]).to(device)
     
+    if "load_path" in opt:
+        state_dict = torch.load(opt["load_path"], map_location=device)
+
+        if "state_dict" in state_dict:
+            ### migrate training weights from mmaction
+            state_dict = state_dict["state_dict"]
+            from collections import OrderedDict
+
+            i_state_dict = OrderedDict()
+            for key in state_dict.keys():
+                if "cls" in key:
+                    tkey = key.replace("cls", "vqa")
+                elif "backbone" in key:
+                    i_state_dict["fragments_"+key] = state_dict[key]
+                    i_state_dict["resize_"+key] = state_dict[key]
+                else:
+                    i_state_dict[key] = state_dict[key]
+        t_state_dict = model.state_dict()
+        for key, value in t_state_dict.items():
+            if key in i_state_dict and i_state_dict[key].shape != value.shape:
+                i_state_dict.pop(key)
+            
+        print(model.load_state_dict(i_state_dict, strict=False))
+    
     if opt.get("split_seed", -1) > 0:
         num_splits = 10
     else:

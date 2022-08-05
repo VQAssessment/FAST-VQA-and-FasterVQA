@@ -1,4 +1,4 @@
-name: K400-Adapt
+name: FAST-K400
 num_epochs: 30
 l_num_epochs: 0
 warmup_epochs: 2.5
@@ -26,7 +26,6 @@ data:
                     aligned: 32
             clip_len: 32
             frame_interval: 2
-            t_frag: 8
             num_clips: 1
     val:
         type: FusionDatasetK400
@@ -46,8 +45,7 @@ data:
                     aligned: 32
             clip_len: 32
             frame_interval: 2
-            t_frag: 8
-            num_clips: 1
+            num_clips: 4
             
 model:
     type: DiViDeAddEvaluator
@@ -70,7 +68,4 @@ optimizer:
     wd: 0.05
         
 load_path: ../model_baselines/NetArch/swin_tiny_patch244_window877_kinetics400_1k.pth
-test_load_path: ./pretrained_weights/FASTER-VQA-B-AEC_val-livevqc_s_dev_v0.0.pth
-
-    
-        
+test_load_path: 

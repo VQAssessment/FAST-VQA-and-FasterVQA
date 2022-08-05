@@ -34,9 +34,6 @@ data:
             anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
             data_prefix: ../datasets/LIVE_VQC/
             sample_types:
-                #resize:
-                #    size_h: 224
-                #    size_w: 224
                 fragments:
                     fragments_h: 7
                     fragments_w: 7
@@ -123,8 +120,4 @@ optimizer:
     wd: 0.05
         
 load_path: ../pretrained/swin_tiny_patch244_window877_kinetics400_1k.pth
-test_load_path: ./pretrained_weights/fast_vqa_v0_3.pth
-
-
-    
-        
+test_load_path: ./pretrained_weights/FAST-VQA-B-Refactor-From-Scratch-75ep_s_dev_v0.0.pth #./pretrained_weights/FAST_VQA_B_1*4.pth

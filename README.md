@@ -23,6 +23,7 @@ In this release, we have refactored the training and testing code. The refactore
 在这一版本中，我们对训练和测试的代码进行了重构。重构后的代码可以达到与原始版本相同的性能，并允许修改网络结构/采样的超参数/损失函数。
 
 
+![Fig](demos/f3d.png)
 
 
 
@@ -122,54 +123,72 @@ to install the full FAST-VQA with its requirements.
 We supported pretrained weights for several versions:
 
 
+| Name |  Pretrain   | Spatial Fragments | Temporal Fragments | PLCC@LSVQ_1080p | PLCC@LSVQ_test | PLCC@LIVE_VQC | PLCC@KoNViD | MACs | config | model |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+|  FAST-VQA-B (ECCV2022) | Kinetics-400 |  7*32   |     1\*32\*(4)     |  0.814 |  0.877  |   0.844 | 0.855   |  279G  |  [config](options/fast/fast-b.yml)  | [github](NONE) |
+|  FAST-VQA-B-From-Scratch (:sparkles: New!) | None |  7*32   |     1*32*(4)     |  0.707 | 0.791 | 0.766 | 0.793   |  279G  |  [config](options/fast/fast-b.yml)  | [github](NONE) |
+|  FAST-VQA-B-3D (:sparkles: New!) | Kinetics-400  |  7*32   |    8*4(*1)      |  0.811  |  0.874  | 0.837 | 0.864   |  69G |  [config](options/fast/f3dvqa-b.yml)   | [github](NONE) |
+|  FAST-VQA-B-3D-From-Scratch (:sparkles: New!) | None  |  7*32   |    8*4(*1)      | 0.678 | 0.754 | 0.739 | 0.773  |  69G |  [config](options/fast/f3dvqa-b.yml)   | [github](NONE) |
+|  FAST-VQA-M (ECCV2022) | Kinetics-400  |  4*32  |     1\*32(\*4)     |  0.773  |  0.854  |  0.810 | 0.832  |  46G  |  [config](options/fast/fast-m.yml)   | [github](NONE) |
+
+#### Step 2: Download Corresponding Datasets
+
+LSVQ: [Github](https://github.com/baidut/PatchVQ)
+KoNViD-1k: [Official Site](http://database.mmsp-kn.de/konvid-1k-database.html)
+LIVE-VQC: [Official Site](http://live.ece.utexas.edu/research/LIVEVQC/)
+
+#### Step 3: Run the following one-line script!
+
+```
+python new_test.py -o [YOUR_OPTIONS]
+```
 
 
-###
-
-### Train FAST-VQA
 
 
-### Train from Recognition Features
+### Training
+训练
+
+### Get Pretrained Weights from Recognition
 
 You might need to download the original [Swin-T Weights](https://github.com/SwinTransformer/storage/releases/download/v1.0.4/swin_tiny_patch244_window877_kinetics400_1k.pth) to initialize the model.
 
+### Train with large dataset (LSVQ)
 
-#### Intra Dataset Training
+To train FAST-VQA-B, please run
+
+```
+python new_train.py -o options/fast/fast-b.yml
+```
+
+To train FAST-VQA-M, please run
+
+```
+python new_train.py -o options/fast/fast-m.yml
+```
+
+To train FAST-VQA-B-3D, please run
+
+```
+python new_train.py -o options/fast/f3dvqa-b.yml
+```
+
+
+
+### Finetune on small datasets with provided weights (*from 1.0 version*)
+
+You should download our [v1.0-weights](https://github.com/TimothyHTimothy/FAST-VQA/releases/tag/v1.0.0-open-release-weights) for this function. We are working on to refactor this part soon.
 
 This training will split the dataset into 10 random train/test splits (with random seed 42) and report the best result on the random split of the test dataset. 
 
 ```shell
-python train.py -d $DATASET$ --from_ar
+python inference.py -d $DATASET$ 
 ```
 
-Supported datasets are KoNViD-1k, LIVE_VQC, CVD2014, YouTube-UGC.
+Note that this part only support FAST-VQA-B and FAST-VQA-M, without FAST-VQA-B-3D.
 
-#### Cross Dataset Training
+Supported `$DATASET$` are KoNViD-1k, LIVE_VQC, CVD2014, LIVE-Qualcomm, YouTube-UGC.
 
-This training will do no split and directly report the best result on the provided validation dataset.
-
-```shell
-python inference.py -d $TRAINSET$-$VALSET$ --from_ar -lep 0 -ep 30
-```
-
-Supported TRAINSET is LSVQ, and VALSETS can be LSVQ(LSVQ-test+LSVQ-1080p), KoNViD, LIVE_VQC.
-
-
-### Finetune with provided weights
-
-#### Intra Dataset Training
-
-This training will split the dataset into 10 random train/test splits (with random seed 42) and report the best result on the random split of the test dataset. 
-
-```shell
-python inference.py -d $DATASET$
-```
-
-Supported datasets are KoNViD-1k, LIVE_VQC, CVD2014, YouTube-UGC.
-
-## Switching to FASTER-VQA
-
-You can add the argument `-m FASTER` in any scripts (```finetune.py, inference.py, visualize.py```) above to switch to FAST-VQA-M instead of FAST-VQA.
 
 ## Citation
 
@@ -180,6 +199,16 @@ The following paper is to be cited in the bibliography if relevant papers are pr
   author={Wu, Haoning and Chen, Chaofeng and Hou, Jingwen and Liang, Liao and Wang, Annan and Sun, Wenxiu and Yan, Qiong and Weisi, Lin},
   journal={Proceedings of European Conference of Computer Vision (ECCV)},
   year={2022}
+}
+```
+
+And this code library if it is used.
+```
+@misc{end2endvideoqualitytool,
+  title = {Open Source Deep End-to-End Video Quality Assessment Toolbox},
+  author = {Wu, Haoning},
+  year = {2022},
+  url = {http://github.com/timothyhtimothy/fast-vqa}
 }
 ```
 
