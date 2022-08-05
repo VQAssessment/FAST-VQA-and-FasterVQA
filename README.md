@@ -125,11 +125,11 @@ We supported pretrained weights for several versions:
 
 | Name |  Pretrain   | Spatial Fragments | Temporal Fragments | PLCC@LSVQ_1080p | PLCC@LSVQ_test | PLCC@LIVE_VQC | PLCC@KoNViD | MACs | config | model |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-|  FAST-VQA-B (ECCV2022) | Kinetics-400 |  7*32   |     1\*32\*(4)     |  0.814 |  0.877  |   0.844 | 0.855   |  279G  |  [config](options/fast/fast-b.yml)  | [github](NONE) |
-|  FAST-VQA-B-From-Scratch (:sparkles: New!) | None |  7*32   |     1*32*(4)     |  0.707 | 0.791 | 0.766 | 0.793   |  279G  |  [config](options/fast/fast-b.yml)  | [github](NONE) |
-|  FAST-VQA-B-3D (:sparkles: New!) | Kinetics-400  |  7*32   |    8*4(*1)      |  0.811  |  0.874  | 0.837 | 0.864   |  69G |  [config](options/fast/f3dvqa-b.yml)   | [github](NONE) |
-|  FAST-VQA-B-3D-From-Scratch (:sparkles: New!) | None  |  7*32   |    8*4(*1)      | 0.678 | 0.754 | 0.739 | 0.773  |  69G |  [config](options/fast/f3dvqa-b.yml)   | [github](NONE) |
-|  FAST-VQA-M (ECCV2022) | Kinetics-400  |  4*32  |     1\*32(\*4)     |  0.773  |  0.854  |  0.810 | 0.832  |  46G  |  [config](options/fast/fast-m.yml)   | [github](NONE) |
+|  FAST-VQA-B (ECCV2022) | Kinetics-400 |  7*32   |     1\*32\*(4)     |  0.814 |  0.877  |   0.844 | 0.855   |  279G  |  [config](options/fast/fast-b.yml)  | [github](https://github.com/TimothyHTimothy/FAST-VQA/releases/download/v2.0.0/FAST_VQA_B_1_4.pth) |
+|  FAST-VQA-B-From-Scratch (:sparkles: New!) | None |  7*32   |     1*32*(4)     |  0.707 | 0.791 | 0.766 | 0.793   |  279G  |  [config](options/fast/fast-b.yml)  | [github](https://github.com/TimothyHTimothy/FAST-VQA/releases/download/v2.0.1/FAST_VQA_B_1_4_Scr.pth) |
+|  FAST-VQA-B-3D (:sparkles: New!) | Kinetics-400  |  7*32   |    8*4(*1)      |  0.811  |  0.874  | 0.837 | 0.864   |  69G |  [config](options/fast/f3dvqa-b.yml)   | [github](https://github.com/TimothyHTimothy/FAST-VQA/releases/download/v2.0.0/FAST_VQA_3D_1_1.pth) |
+|  FAST-VQA-B-3D-From-Scratch (:sparkles: New!) | None  |  7*32   |    8*4(*1)      | 0.685 | 0.760 | 0.739 | 0.773  |  69G |  [config](options/fast/f3dvqa-b.yml)   | [github](https://github.com/TimothyHTimothy/FAST-VQA/releases/download/v2.0.1/FAST_VQA_3D_1_1_Scr.pth) |
+|  FAST-VQA-M (ECCV2022) | Kinetics-400  |  4*32  |     1\*32(\*4)     |  0.773  |  0.854  |  0.810 | 0.832  |  46G  |  [config](options/fast/fast-m.yml)   | [github](https://github.com/TimothyHTimothy/FAST-VQA/releases/download/v2.0.0/FAST_VQA_M_1_4.pth) |
 
 #### Step 2: Download Corresponding Datasets
 
