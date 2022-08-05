@@ -74,8 +74,10 @@ We also support different temporal sampling approaches:
 IP-NLR head can generate local quality maps for videos.
 
 ## Installation
+安装
 
-### Requirements
+### Dependencies
+依赖
 
 The original library is build with
 
@@ -91,7 +93,8 @@ To get all the requirements, please run
 pip install -r requirements.txt
 ```
 
-### Direct install
+### Direct Install
+直接安装
 
 You can run
 
@@ -108,58 +111,22 @@ python setup.py installl
 to install the full FAST-VQA with its requirements.
 
 ## Usage
+使用方法
 
-### Visualize *fragments* and Quality Maps
+### Quick Benchmark
+快速测试
 
-If you would like to visualize the proposed *fragments*, you can generate the demo visualizations by yourself, via the following script:
 
+#### Step 1: Get Pretrained Weights
 
-```shell
-python visualize.py -d $DATASET$ 
-```
-
-You can also visualize the patch-wise local quality maps rendered on fragments, via 
-
-```shell
-python visualize.py -d $DATASET$ -nm
-```
+We supported pretrained weights for several versions:
 
 
 
-### Inference on Scripts
 
-You can install this directory by running
+###
 
-```shell
-pip install .
-```
-
-Then you can embed these lines into your python scripts:
-
-```python
-from fastvqa import deep_end_to_end_vqa
-
-dum_video = torch.randn((3,240,720,1280)) # A sample 720p, 240-frame video
-vqa = deep_end_to_end_vqa(True, model_type=model_type)
-score = vqa(dum_video)
-print(score)
-```
-
-This script will automatically download the model weights pretrained from LSVQ.
-
-### Benchmarking FAST-VQA
-
-You can directly benchmark the model with mainstream benchmark VQA datasets.
-
-```shell
-python inference.py -d $DATASET$
-```
-
-Available datasets are LIVE_VQC, KoNViD, CVD2014, YouTubeUGC), LSVQ.
-
-
-
-## Train FAST-VQA
+### Train FAST-VQA
 
 
 ### Train from Recognition Features
