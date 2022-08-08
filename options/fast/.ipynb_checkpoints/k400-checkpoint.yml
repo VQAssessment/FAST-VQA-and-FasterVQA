@@ -1,4 +1,4 @@
-name: FAST-K400
+name: FAST-K400-Ad
 num_epochs: 30
 l_num_epochs: 0
 warmup_epochs: 2.5

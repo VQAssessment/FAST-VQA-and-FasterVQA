@@ -40,10 +40,6 @@ def train_test_split(dataset_path, ann_file, ratio=0.8, seed=42):
     )
 
 
-def ce_loss(y_pred, y):
-    return torch.nn.functional.cross_entropy(y_pred, y.long().flatten().detach())
-
-
 def rank_loss(y_pred, y):
     ranking_loss = torch.nn.functional.relu(
         (y_pred - y_pred.t()) * torch.sign((y.t() - y))
@@ -108,20 +104,107 @@ def finetune_epoch(ft_loader, model, model_ema, optimizer, scheduler, device, ep
             if key in data:
                 video[key] = data[key].to(device)
         
-
+        if need_upsampled:
+            up_video = {}
+            for key in sample_types:
+                if key+"_up" in data:
+                    up_video[key] = data[key+"_up"].to(device)
         
         y = data["gt_label"].float().detach().to(device).unsqueeze(-1)
-        scores = model(video, inference=False,
-                            reduce_scores=False) 
-        if len(scores) > 1:
-            y_pred = reduce(lambda x,y:x+y, scores)
+        if need_feat:
+            scores, feats = model(video, inference=False,
+                                  return_pooled_feats=True, 
+                                  reduce_scores=False) 
+            if len(scores) > 1:
+                y_pred = reduce(lambda x,y:x+y, scores)
+            else:
+                y_pred = scores[0]
+            y_pred = y_pred.mean((-3, -2, -1))
         else:
-            y_pred = scores[0]
-        y_pred = y_pred.mean((-3, -2, -1))
-        
+            scores = model(video, inference=False,
+                                  reduce_scores=False) 
+            if len(scores) > 1:
+                y_pred = reduce(lambda x,y:x+y, scores)
+            else:
+                y_pred = scores[0]
+            y_pred = y_pred.mean((-3, -2, -1))
+        if need_upsampled:
+            if need_feat:
+                scores_up, feats_up = model(up_video, inference=False, 
+                                            return_pooled_feats=True,
+                                            reduce_scores=False)
+                if len(scores) > 1:
+                    y_pred_up = reduce(lambda x,y:x+y, scores_up)
+                else:
+                    y_pred_up = scores_up[0]
+                y_pred_up = y_pred_up.mean((-3, -2, -1))
+            else:
+                y_pred_up = model(up_video, inference=False).mean((-3, -2, -1))                                                           
         frame_inds = data["frame_inds"]
+        
         # Plain Supervised Loss
-        loss = ce_loss(y_pred, y)
+        p_loss, r_loss = plcc_loss(y_pred, y), rank_loss(y_pred, y)
+        
+        loss = p_loss + 0.3 * r_loss
+        wandb.log(
+            {
+                "train/plcc_loss": p_loss.item(),
+                "train/rank_loss": r_loss.item(),
+            }
+        )
+        
+        if need_separate_sup:
+            p_loss_a = plcc_loss(scores[0].mean((-3, -2, -1)), y)
+            p_loss_b = plcc_loss(scores[1].mean((-3, -2, -1)), y)
+            loss += 0.15 * (p_loss_a + p_loss_b)
+            wandb.log(
+                {
+                    "train/plcc_loss_a": p_loss_a.item(),
+                    "train/plcc_loss_b": p_loss_b.item(),
+                }
+            )
+        if need_upsampled:
+            ## Supervised Loss for Upsampled Samples
+            if need_separate_sup:
+                p_loss_up_a = plcc_loss(scores_up[0].mean((-3, -2, -1)), y)
+                p_loss_up_b = plcc_loss(scores_up[1].mean((-3, -2, -1)), y)
+                loss += 0.15 * (p_loss_up_a + p_loss_up_b)
+                wandb.log(
+                    {
+                        "train/plcc_loss_up_a": p_loss_up_a.item(),
+                        "train/plcc_loss_up_b": p_loss_up_b.item(),
+                    }
+                )
+            p_loss_up, r_loss_up = plcc_loss(y_pred_up, y), rank_loss(y_pred_up, y)
+            loss += p_loss_up + 0.1 * r_loss_up
+            wandb.log(
+                {
+                    "train/up_plcc_loss": p_loss_up.item(),
+                    "train/up_rank_loss": r_loss_up.item(),
+                }
+            )
+            
+            
+            if need_fused:
+                #print(y_pred, y_pred_up)
+                fused_mask = torch.where(torch.randn(*y_pred.shape) > 0, 1, 0).to(y_pred.device)
+                y_pred_f = y_pred * fused_mask + y_pred_up * (1 - fused_mask)
+                #print(y_pred_f)
+                p_loss_f, r_loss_f = plcc_loss(y_pred_f, y), rank_loss(y_pred_f, y)
+                loss += 0.25 * (p_loss_f + 0.1 * r_loss_f)
+                wandb.log(
+                    {
+                        "train/f_plcc_loss": p_loss_f.item(),
+                        "train/f_rank_loss": r_loss_f.item(),
+                    }
+                )
+            
+            if need_feat:
+                ## Self-Supervised Loss, Similarity between different sampling densities
+                for key in feats:
+                    sim_loss = self_similarity_loss(feats[key], feats_up[key])
+                    loss += 0.25 * sim_loss
+                    wandb.log({f"train/{key}_sim_loss": sim_loss.item(),})
 
         wandb.log({"train/total_loss": loss.item(),})
 
@@ -154,49 +237,66 @@ def profile_inference(inf_set, model, device):
 
 def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s', save_name="divide"):
 
+    results = []
 
-    best_m, best_t1, best_t5 = best_
-    
-    confusion_matrix = torch.zeros(400,400)
-    t5_confusion_matrix = torch.zeros(400,400)
-    
+    best_s, best_p, best_k, best_r = best_
  
     for i, data in enumerate(tqdm(inf_loader, desc="Validating")):
         result = dict()
-        video = {}
+        video, video_up = {}, {}
         for key in sample_types:
             if key in data:
                 video[key] = data[key].to(device)
                 ## Reshape into clips
                 b, c, t, h, w = video[key].shape
                 video[key] = video[key].reshape(b, c, data["num_clips"], t // data["num_clips"], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"], c, t // data["num_clips"], h, w) 
+            if key + "_up" in data:
+                video_up[key] = data[key+"_up"].to(device)
+                ## Reshape into clips
+                b, c, t, h, w = video_up[key].shape
+                video_up[key] = video_up[key].reshape(b, c, data["num_clips"], t // data["num_clips"], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"], c, t // data["num_clips"], h, w) 
+            #.unsqueeze(0)
         with torch.no_grad():
-            y = model(video)
-            y = y.mean((-5,-3,-2,-1)).cpu().numpy()
-            y_sort = np.argsort(y).flatten()[::-1]
-            y = y.argmax()
-         
-        confusion_matrix[y][data["gt_label"]] += 1
-        for i in y_sort[:5]:
-            t5_confusion_matrix[i][data["gt_label"]] += 1
-        del video
+            result["pr_labels"] = model(video).cpu().numpy()
+            if len(list(video_up.keys())) > 0:
+                result["pr_labels_up"] = model(video_up).cpu().numpy()
+                
+        result["gt_label"] = data["gt_label"].item()
+        del video, video_up
         # result['frame_inds'] = data['frame_inds']
         # del data
+        results.append(result)
         
-    t1 = torch.sum(torch.diag(confusion_matrix)) / torch.sum(confusion_matrix)
-    t5 = torch.sum(torch.diag(t5_confusion_matrix)) / torch.sum(confusion_matrix)
-    m = (torch.diag(confusion_matrix) / torch.sum(confusion_matrix, 1)).mean()
-    
-    
+    ## generate the demo video for video quality localization
+    gt_labels = [r["gt_label"] for r in results]
+    pr_labels = [np.mean(r["pr_labels"][:]) for r in results]
+    pr_labels = rescale(pr_labels, gt_labels)
     
 
-    wandb.log({f"val_{suffix}/MAcc-{suffix}": m, f"val_{suffix}/T1Acc-{suffix}": t1, f"val_{suffix}/T5Acc-{suffix}": t5,})
+
+    s = spearmanr(gt_labels, pr_labels)[0]
+    p = pearsonr(gt_labels, pr_labels)[0]
+    k = kendallr(gt_labels, pr_labels)[0]
+    r = np.sqrt(((gt_labels - pr_labels) ** 2).mean())
+
+    wandb.log({f"val_{suffix}/SRCC-{suffix}": s, f"val_{suffix}/PLCC-{suffix}": p, f"val_{suffix}/KRCC-{suffix}": k, f"val_{suffix}/RMSE-{suffix}": r})
     
+    
+    if "pr_labels_up" in results[0]:
+        pr_labels_up = [np.mean(r["pr_labels_up"][:]) for r in results]
+        pr_labels_up = rescale(pr_labels_up, gt_labels)
+
+        ups = spearmanr(gt_labels, pr_labels_up)[0]
+        upp = pearsonr(gt_labels, pr_labels_up)[0]
+        upk = kendallr(gt_labels, pr_labels_up)[0]
+        upr = np.sqrt(((gt_labels - pr_labels_up) ** 2).mean())
+
+        wandb.log({f"val_{suffix}/up-SRCC-{suffix}": ups, f"val_{suffix}/up-PLCC-{suffix}": upp, f"val_{suffix}/up-KRCC-{suffix}": upk, f"val_{suffix}/up-RMSE-{suffix}": upr})
+        
+    del results, result #, video, video_up
     torch.cuda.empty_cache()
-    
 
-
-    if t1 > best_t1 and save_model:
+    if s + p > best_s + best_p and save_model:
         state_dict = model.state_dict()
         torch.save(
             {
@@ -205,17 +305,28 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
             },
             f"pretrained_weights/{save_name}_{suffix}_dev_v0.0.pth",
         )
-        
-    best_t5 = max(t5, best_t5)
-    best_t1 = max(t1, best_t1)
-    best_m = max(m, best_m)
 
-
-    print(
-        f"For {len(inf_loader)} videos, \nthe accuracy of the model: [{suffix}] is as follows:\n  MAcc: {m:.4f} best: {best_m:.4f} \n  T1Acc:  {t1:.4f} best: {best_t1:.4f}  \n  T5Acc: {t5:.4f} best: {best_t5:.4f}."
+    best_s, best_p, best_k, best_r = (
+        max(best_s, s),
+        max(best_p, p),
+        max(best_k, k),
+        min(best_r, r),
     )
 
-    return best_m, best_t1, best_t5
+    wandb.log(
+        {
+            f"val_{suffix}/best_SRCC-{suffix}": best_s,
+            f"val_{suffix}/best_PLCC-{suffix}": best_p,
+            f"val_{suffix}/best_KRCC-{suffix}": best_k,
+            f"val_{suffix}/best_RMSE-{suffix}": best_r,
+        }
+    )
+
+    print(
+        f"For {len(inf_loader)} videos, \nthe accuracy of the model: [{suffix}] is as follows:\n  SROCC: {s:.4f} best: {best_s:.4f} \n  PLCC:  {p:.4f} best: {best_p:.4f}  \n  KROCC: {k:.4f} best: {best_k:.4f} \n  RMSE:  {r:.4f} best: {best_r:.4f}."
+    )
+
+    return best_s, best_p, best_k, best_r
 
     # torch.save(results, f'{args.save_dir}/results_{dataset.lower()}_s{32}*{32}_ens{args.famount}.pkl')
 
@@ -245,34 +356,12 @@ def main():
     
     model = getattr(models, opt["model"]["type"])(**opt["model"]["args"]).to(device)
     
-    if "load_path" in opt:
-        state_dict = torch.load(opt["load_path"], map_location=device)
-
-        if "state_dict" in state_dict:
-            ### migrate training weights from mmaction
-            state_dict = state_dict["state_dict"]
-            from collections import OrderedDict
-
-            i_state_dict = OrderedDict()
-            for key in state_dict.keys():
-                if "cls" in key:
-                    tkey = key.replace("cls", "vqa")
-                elif "backbone" in key:
-                    i_state_dict["fragments_"+key] = state_dict[key]
-                    i_state_dict["resize_"+key] = state_dict[key]
-                else:
-                    i_state_dict[key] = state_dict[key]
-        t_state_dict = model.state_dict()
-        for key, value in t_state_dict.items():
-            if key in i_state_dict and i_state_dict[key].shape != value.shape:
-                i_state_dict.pop(key)
-            
-        print(model.load_state_dict(i_state_dict, strict=False))
-    
     if opt.get("split_seed", -1) > 0:
         num_splits = 10
     else:
         num_splits = 1
+        
+    print(opt["split_seed"])
         
     for split in range(num_splits):
         
@@ -281,12 +370,14 @@ def main():
                                          opt["data"]["train"]["args"]["anno_file"], 
                                          seed=opt["split_seed"] * split)
             opt["data"]["train"]["args"]["anno_file"], opt["data"]["val"]["args"]["anno_file"] = split_duo
-
+            
+        
         train_datasets = {}
         for key in opt["data"]:
             if key.startswith("train"):
                 train_dataset = getattr(datasets, opt["data"][key]["type"])(opt["data"][key]["args"])
                 train_datasets[key] = train_dataset
+                print(len(train_dataset.video_infos))
         
         train_loaders = {}
         for key, train_dataset in train_datasets.items():
@@ -297,10 +388,10 @@ def main():
         val_datasets = {}
         for key in opt["data"]:
             if key.startswith("val"):
-                val_datasets[key] = getattr(datasets, 
-                                            opt["data"][key]["type"])(opt["data"][key]["args"])
-
-
+                val_dataset = getattr(datasets, opt["data"][key]["type"])(opt["data"][key]["args"])
+                print(len(val_dataset.video_infos))
+                val_datasets[key] = val_dataset
+                
         val_loaders = {}
         for key, val_dataset in val_datasets.items():
             val_loaders[key] = torch.utils.data.DataLoader(
@@ -313,8 +404,31 @@ def main():
             name=opt["name"]+f'_{split}' if num_splits > 1 else opt["name"],
             reinit=True,
         )
+        
+        if "load_path" in opt:
+            state_dict = torch.load(opt["load_path"], map_location=device)
+
+            if "state_dict" in state_dict:
+                ### migrate training weights from mmaction / F-adaptation / LSVQ-pretrain
+                state_dict = state_dict["state_dict"]
+                from collections import OrderedDict
+
+                i_state_dict = OrderedDict()
+                for key in state_dict.keys():
+                    if "cls" in key:
+                        tkey = key.replace("cls", "vqa")
+                    elif "backbone" in key and "_backbone" not in key:
+                        i_state_dict["fragments_"+key] = state_dict[key]
+                        i_state_dict["resize_"+key] = state_dict[key]
+                    else:
+                        i_state_dict[key] = state_dict[key]
+            t_state_dict = model.state_dict()
+            for key, value in t_state_dict.items():
+                if key in i_state_dict and i_state_dict[key].shape != value.shape:
+                    i_state_dict.pop(key)
             
-        #print(model)
+            print(model.load_state_dict(i_state_dict, strict=False))
+            
 
         if opt["ema"]:
             from copy import deepcopy
@@ -325,6 +439,8 @@ def main():
         #profile_inference(val_dataset, model, device)    
 
         # finetune the model
+
+
         param_groups=[]
 
         for key, value in dict(model.named_children()).items():
@@ -353,8 +469,8 @@ def main():
         bests = {}
         bests_n = {}
         for key in val_loaders:
-            bests[key] = 0,0,0
-            bests_n[key] = 0,0,0
+            bests[key] = -1,-1,-1,1000
+            bests_n[key] = -1,-1,-1,1000
         
 
         for key, value in dict(model.named_children()).items():
@@ -393,7 +509,8 @@ def main():
                     the best validation accuracy of the model-s is as follows:
                     SROCC: {bests[key][0]:.4f}
                     PLCC:  {bests[key][1]:.4f}
-                    KROCC: {bests[key][2]:.4f}."""
+                    KROCC: {bests[key][2]:.4f}
+                    RMSE:  {bests[key][3]:.4f}."""
                 )
 
                 print(
@@ -401,7 +518,8 @@ def main():
                     the best validation accuracy of the model-n is as follows:
                     SROCC: {bests_n[key][0]:.4f}
                     PLCC:  {bests_n[key][1]:.4f}
-                    KROCC: {bests_n[key][2]:.4f}."""
+                    KROCC: {bests_n[key][2]:.4f}
+                    RMSE:  {bests_n[key][3]:.4f}."""
                 )
 
         for key, value in dict(model.named_children()).items():
@@ -416,7 +534,6 @@ def main():
         #    model_ema if model_ema is not None else model,
         #    device, best_, save_model=False, save_name=opt["name"],
         #)
-        
         
         for epoch in range(opt["num_epochs"]):
             print(f"Finetune Epoch {epoch}:")

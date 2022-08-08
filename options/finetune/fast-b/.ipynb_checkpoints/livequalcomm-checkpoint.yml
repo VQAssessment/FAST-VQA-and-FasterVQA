@@ -1,22 +1,24 @@
-name: FAST-K400-Ad
-num_epochs: 30
-l_num_epochs: 0
+name: FAST-B_1*4_To_LIVE-Qualcomm
+num_epochs: 20
+l_num_epochs: 10
 warmup_epochs: 2.5
-ema: false
+ema: true
 save_model: true
 batch_size: 16
 num_workers: 6
+split_seed: 42
+
 
 wandb:
     project_name: VQA_Experiments_2022
 
 data:
     train:
-        type: FusionDatasetK400
+        type: FusionDataset
         args:
             phase: train
-            anno_file: ../datasets/Kinetics/kinetics-dataset/k400/train_labels.txt
-            data_prefix: ../datasets/Kinetics/kinetics-dataset/k400/train/
+            anno_file: ./examplar_data_labels/LIVE_Qualcomm/labels.txt
+            data_prefix: ../datasets/LIVE_Qualcomm/
             sample_types:
                 fragments:
                     fragments_h: 7
@@ -28,11 +30,11 @@ data:
             frame_interval: 2
             num_clips: 1
     val:
-        type: FusionDatasetK400
+        type: FusionDataset
         args:
             phase: test
-            anno_file: ../datasets/Kinetics/kinetics-dataset/k400/val_labels.txt
-            data_prefix: ../datasets/Kinetics/kinetics-dataset/k400/val/
+            anno_file: ./examplar_data_labels/LIVE_Qualcomm/labels.txt
+            data_prefix: ../datasets/LIVE_Qualcomm/
             sample_types:
                 #resize:
                 #    size_h: 224
@@ -46,7 +48,7 @@ data:
             clip_len: 32
             frame_interval: 2
             num_clips: 4
-            
+
 model:
     type: DiViDeAddEvaluator
     args:
@@ -54,18 +56,20 @@ model:
             fragments:
                 checkpoint: false
                 pretrained: 
-        var: true
         backbone_size: swin_tiny_grpb
         backbone_preserve_keys: fragments
         divide_head: false
         vqa_head:
             in_channels: 768
-            out_channels: 400
+            hidden_channels: 64
             
 optimizer:
     lr: !!float 1e-3
     backbone_lr_mult: !!float 1e-1
     wd: 0.05
         
-load_path: ../model_baselines/NetArch/swin_tiny_patch244_window877_kinetics400_1k.pth
+load_path: ./pretrained_weights/FAST_VQA_B_1*4.pth
 test_load_path: 
+
+    
+        
