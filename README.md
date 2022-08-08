@@ -175,19 +175,32 @@ python new_train.py -o options/fast/f3dvqa-b.yml
 
 
 
-### Finetune on small datasets with provided weights (*from 1.0 version*)
+### Finetune on small datasets with provided weights
+在小规模数据集上进行调优
 
-You should download our [v1.0-weights](https://github.com/TimothyHTimothy/FAST-VQA/releases/tag/v1.0.0-open-release-weights) for this function. We are working on to refactor this part soon.
+
 
 This training will split the dataset into 10 random train/test splits (with random seed 42) and report the best result on the random split of the test dataset. 
 
 ```shell
-python inference.py -d $DATASET$ 
+python split_train.py -opt [YOUR_OPTION_FILE] 
 ```
 
-Note that this part only support FAST-VQA-B and FAST-VQA-M, without FAST-VQA-B-3D.
+You may see option files in [Finetune Config Files](./options/finetune/), we are also working on reporting official results based on this new refactored codebase, and add them here soon. Also, you can switch to the `old_master` and reprodeuce our results for old codes, as follows:
 
-Supported `$DATASET$` are KoNViD-1k, LIVE_VQC, CVD2014, LIVE-Qualcomm, YouTube-UGC.
+
+*Results for FAST-B with old codebase:*
+
+|       | KoNViD-1k | CVD2014 | LIVE-Qualcomm | LIVE-VQC | YouTube-UGC |
+| ----  |    ----   |   ----  |      ----     |   ----   |    ----     |
+| SROCC | 0.891 | 0.891 | 0.819 | 0.849 | 0.855 |
+| PLCC  | 0.892 | 0.903 | 0.851 | 0.862 | 0.852 |
+
+
+
+Note that this part only support FAST-VQA-B and FAST-VQA-B-3D; but you may build your own option files for other variants.
+
+Supported datasets are KoNViD-1k, LIVE_VQC, CVD2014, LIVE-Qualcomm, YouTube-UGC.
 
 
 ## Citation
