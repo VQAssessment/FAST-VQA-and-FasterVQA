@@ -362,13 +362,16 @@ def main():
         num_splits = 1
         
     print(opt["split_seed"])
+    
+    if opt.get("split_seed", -1) > 0:
+        ann_path = opt["data"]["train"]["args"]["anno_file"]
         
-    for split in range(num_splits):
-        
+    for split in range(0,num_splits):
+        print(split)
         if opt.get("split_seed", -1) > 0:
             split_duo = train_test_split(opt["data"]["train"]["args"]["data_prefix"],
-                                         opt["data"]["train"]["args"]["anno_file"], 
-                                         seed=opt["split_seed"] * split)
+                                         ann_path, 
+                                         seed=opt["split_seed"] * (split+1))
             opt["data"]["train"]["args"]["anno_file"], opt["data"]["val"]["args"]["anno_file"] = split_duo
             
         

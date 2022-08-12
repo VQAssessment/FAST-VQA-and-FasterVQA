@@ -57,9 +57,11 @@ class VARHead(nn.Module):
         else:
             self.dropout = None
         self.fc = nn.Conv3d(self.in_channels, self.out_channels, (1, 1, 1))
+        self.avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
 
     def forward(self, x, rois=None):
         x = self.dropout(x)
+        x = self.avg_pool(x)
         out = self.fc(x)
         return out
 

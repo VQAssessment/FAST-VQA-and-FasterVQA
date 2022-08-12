@@ -23,7 +23,7 @@ data:
                     fragments_w: 7
                     fsize_h: 32
                     fsize_w: 32
-                    aligned: 32
+                    aligned: 4
             clip_len: 32
             frame_interval: 2
             t_frag: 8

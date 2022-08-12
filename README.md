@@ -26,6 +26,16 @@ In this release, we have refactored the training and testing code. The refactore
 ![Fig](demos/f3d.png)
 
 
+## See our Weights & Biases training logs
+我们公开了训练曲线！
+
+We are reproducing several experiments and making public our training logs here.
+
+https://wandb.ai/timothyhwu/Open_FAST_VQA
+
+Now supports:
+- FAST-3D-finetuned-to-KonViD-1k
+
 
 ## :triangular_flag_on_post: Modularized Parts Designed for Development
 为开发设计的模块化架构
@@ -186,16 +196,24 @@ This training will split the dataset into 10 random train/test splits (with rand
 python split_train.py -opt [YOUR_OPTION_FILE] 
 ```
 
-You may see option files in [Finetune Config Files](./options/finetune/), we are also working on reporting official results based on this new refactored codebase, and add them here soon. Also, you can switch to the `old_master` and reprodeuce our results for old codes, as follows:
+You may see option files in [Finetune Config Files](./options/finetune/).
 
 
-*Results for FAST-B with old codebase:*
+Results for [FAST-VQA-B](./options/finetune/fast-b):
+
 
 |       | KoNViD-1k | CVD2014 | LIVE-Qualcomm | LIVE-VQC | YouTube-UGC |
 | ----  |    ----   |   ----  |      ----     |   ----   |    ----     |
 | SROCC | 0.891 | 0.891 | 0.819 | 0.849 | 0.855 |
 | PLCC  | 0.892 | 0.903 | 0.851 | 0.862 | 0.852 |
 
+
+Results for [FAST-VQA-B-3D](./options/finetune/fast-3d):
+
+|       | KoNViD-1k | CVD2014 | LIVE-Qualcomm | LIVE-VQC | YouTube-UGC |
+| ----  |    ----   |   ----  |      ----     |   ----   |    ----     |
+| SROCC | 0.895 | 0.896 | 0.821 | 0.843 | 0.863 |
+| PLCC  | 0.898 | 0.904 | 0.846 | 0.858 | 0.859 |
 
 
 Note that this part only support FAST-VQA-B and FAST-VQA-B-3D; but you may build your own option files for other variants.

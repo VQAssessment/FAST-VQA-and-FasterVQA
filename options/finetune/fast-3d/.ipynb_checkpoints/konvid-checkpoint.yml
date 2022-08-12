@@ -9,7 +9,7 @@ num_workers: 6
 split_seed: 42
 
 wandb:
-    project_name: VQA_Experiments_2022
+    project_name: Open_FAST_VQA
 
 data:
     train:
