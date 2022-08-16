@@ -26,6 +26,14 @@ In this release, we have refactored the training and testing code. The refactore
 ![Fig](demos/f3d.png)
 
 
+## Infer for a single MP4 video
+
+```
+python vqa.py -d [YOUR_INPUT_FILE_PATH]
+```
+
+The default one is for a video in KoNViD-1k with FAST-VQA-3D-B, which should get a score around 0.133.
+
 ## See our Weights & Biases training logs
 我们公开了训练曲线！
 
