@@ -154,7 +154,7 @@ def get_arp_resized_video(
     scale_factor = short_edge / ori_short_edge
     ovideo = video
     video = torch.nn.functional.interpolate(
-        video / 255.0, scale_factor, mode="bilinear"
+        video / 255.0, scale_factors=scale_factor, mode="bilinear"
     )
     video = (video * 255.0).type_as(ovideo)
     return video
@@ -219,6 +219,7 @@ def get_spatial_samples(
     random_crop=0, ## 1: ARP-kept Crop; 2: Square-like Crop
     sample_types={"resize": {}, "fragments": {}}, ## resize | arp_resize | crop | fragments
 ):
+    print(video.shape)
     if random_crop == 1:
         ## Random Crop but keep the ARP
         res_h, res_w = video.shape[-2:]
