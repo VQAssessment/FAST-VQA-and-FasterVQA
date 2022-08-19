@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 import numpy as np
 from timm.models.layers import DropPath, trunc_normal_
+import math
 
 from functools import reduce, lru_cache
 from operator import mul
@@ -230,12 +231,13 @@ class WindowAttention3D(nn.Module):
         trunc_normal_(self.relative_position_bias_table, std=0.02)
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, x, mask=None, fmask=None):
+    def forward(self, x, mask=None, fmask=None, resized_window_size=None):
         """Forward function.
         Args:
             x: input features with shape of (num_windows*B, N, C)
             mask: (0/-inf) mask with shape of (num_windows, N, N) or None
         """
+        #print(x.shape)
         B_, N, C = x.shape
         qkv = (
             self.qkv(x)
@@ -246,9 +248,16 @@ class WindowAttention3D(nn.Module):
 
         q = q * self.scale
         attn = q @ k.transpose(-2, -1)
-
+        
+        if resized_window_size is None:
+            rpi = self.relative_position_index[:N, :N]
+        else:
+            relative_position_index = self.relative_position_index.reshape(*self.window_size, *self.window_size)
+            d, h, w = resized_window_size
+            
+            rpi = relative_position_index[:d,:h,:w,:d,:h,:w]
         relative_position_bias = self.relative_position_bias_table[
-            self.relative_position_index[:N, :N].reshape(-1)
+            rpi.reshape(-1)
         ].reshape(
             N, N, -1
         )  # Wd*Wh*Ww,Wd*Wh*Ww,nH
@@ -257,7 +266,7 @@ class WindowAttention3D(nn.Module):
         ).contiguous()  # nH, Wd*Wh*Ww, Wd*Wh*Ww
         if hasattr(self, "fragment_position_bias_table"):
             fragment_position_bias = self.fragment_position_bias_table[
-                self.relative_position_index[:N, :N].reshape(-1)
+                rpi.reshape(-1)
             ].reshape(
                 N, N, -1
             )  # Wd*Wh*Ww,Wd*Wh*Ww,nH
@@ -382,10 +391,12 @@ class SwinTransformerBlock3D(nn.Module):
             drop=drop,
         )
 
-    def forward_part1(self, x, mask_matrix):
+    def forward_part1(self, x, mask_matrix, resized_window_size=None):
         B, D, H, W, C = x.shape
         window_size, shift_size = get_window_size(
-            (D, H, W), self.window_size, self.shift_size
+            (D, H, W), 
+            self.window_size if resized_window_size is None else resized_window_size, 
+            self.shift_size
         )
 
         x = self.norm1(x)
@@ -425,11 +436,12 @@ class SwinTransformerBlock3D(nn.Module):
             self.finfo_windows = window_partition(shifted_finfo, window_size)
         # W-MSA/SW-MSA
         # print(shift_size)
+        #print("Before Attention", window_size)
         gpi = global_position_index(
             Dp, Hp, Wp, window_size=window_size, shift_size=shift_size, device=x.device
         )
         attn_windows = self.attn(
-            x_windows, mask=attn_mask, fmask=gpi
+            x_windows, mask=attn_mask, fmask=gpi, resized_window_size=window_size if resized_window_size is not None else None,
         )  # self.finfo_windows)  # B*nW, Wd*Wh*Ww, C
         # merge windows
         attn_windows = attn_windows.view(-1, *(window_size + (C,)))
@@ -453,7 +465,7 @@ class SwinTransformerBlock3D(nn.Module):
     def forward_part2(self, x):
         return self.drop_path(self.mlp(self.norm2(x)))
 
-    def forward(self, x, mask_matrix):
+    def forward(self, x, mask_matrix, resized_window_size=None):
         """Forward function.
 
         Args:
@@ -464,9 +476,9 @@ class SwinTransformerBlock3D(nn.Module):
         shortcut = x
         if not self.jump_attention:
             if self.use_checkpoint:
-                x = checkpoint.checkpoint(self.forward_part1, x, mask_matrix)
+                x = checkpoint.checkpoint(self.forward_part1, x, mask_matrix, resized_window_size)
             else:
-                x = self.forward_part1(x, mask_matrix)
+                x = self.forward_part1(x, mask_matrix, resized_window_size)
             x = shortcut + self.drop_path(x)
 
         if self.use_checkpoint:
@@ -588,7 +600,7 @@ class BasicLayer(nn.Module):
         self.shift_size = tuple(i // 2 for i in window_size)
         self.depth = depth
         self.use_checkpoint = use_checkpoint
-        print(window_size)
+        #print(window_size)
         # build blocks
         self.blocks = nn.ModuleList(
             [
@@ -618,7 +630,7 @@ class BasicLayer(nn.Module):
         if self.downsample is not None:
             self.downsample = downsample(dim=dim, norm_layer=norm_layer)
 
-    def forward(self, x):
+    def forward(self, x, resized_window_size=None):
         """Forward function.
 
         Args:
@@ -626,16 +638,20 @@ class BasicLayer(nn.Module):
         """
         # calculate attention mask for SW-MSA
         B, C, D, H, W = x.shape
+        
         window_size, shift_size = get_window_size(
-            (D, H, W), self.window_size, self.shift_size
+            (D, H, W), 
+            self.window_size if resized_window_size is None else resized_window_size, 
+            self.shift_size,
         )
+        #print(window_size)
         x = rearrange(x, "b c d h w -> b d h w c")
         Dp = int(np.ceil(D / window_size[0])) * window_size[0]
         Hp = int(np.ceil(H / window_size[1])) * window_size[1]
         Wp = int(np.ceil(W / window_size[2])) * window_size[2]
         attn_mask = compute_mask(Dp, Hp, Wp, window_size, shift_size, x.device)
         for blk in self.blocks:
-            x = blk(x, attn_mask)
+            x = blk(x, attn_mask, resized_window_size=resized_window_size)
         x = x.view(B, D, H, W, -1)
 
         if self.downsample is not None:
@@ -1001,7 +1017,7 @@ class SwinTransformer3D(nn.Module):
         else:
             raise TypeError("pretrained must be a str or None")
 
-    def forward(self, x, multi=False):
+    def forward(self, x, multi=False, resized_window_size=(4,7,7)):
         """Forward function."""
         x = self.patch_embed(x)
 
@@ -1011,7 +1027,7 @@ class SwinTransformer3D(nn.Module):
             feats = [x]
 
         for layer in self.layers:
-            x = layer(x.contiguous())
+            x = layer(x.contiguous(), resized_window_size)
             if multi:
                 feats += [x]
 

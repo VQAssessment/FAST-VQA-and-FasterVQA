@@ -144,7 +144,7 @@ class DiViDeAddEvaluator(nn.Module):
                 scores = []
                 feats = {}
                 for key in vclips:
-                    feat = getattr(self, key+"_backbone")(vclips[key], multi=self.multi)
+                    feat = getattr(self, key+"_backbone")(vclips[key], multi=self.multi, **kwargs)
                     if hasattr(self, key+"_head"):
                         scores += [getattr(self, key+"_head")(feat)]
                     else:
@@ -164,7 +164,7 @@ class DiViDeAddEvaluator(nn.Module):
             scores = []
             feats = {}
             for key in vclips:
-                feat = getattr(self, key+"_backbone")(vclips[key], multi=self.multi)
+                feat = getattr(self, key+"_backbone")(vclips[key], multi=self.multi, **kwargs)
                 if hasattr(self, key+"_head"):
                     scores += [getattr(self, key+"_head")(feat)]
                 else:

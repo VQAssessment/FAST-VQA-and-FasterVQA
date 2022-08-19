@@ -219,7 +219,6 @@ def get_spatial_samples(
     random_crop=0, ## 1: ARP-kept Crop; 2: Square-like Crop
     sample_types={"resize": {}, "fragments": {}}, ## resize | arp_resize | crop | fragments
 ):
-    print(video.shape)
     if random_crop == 1:
         ## Random Crop but keep the ARP
         res_h, res_w = video.shape[-2:]
@@ -228,6 +227,11 @@ def get_spatial_samples(
         rnd_h = random.randrange(res_h - new_h)
         rnd_w = random.randrange(res_w - new_w)
         video = video[..., rnd_h:rnd_h+new_h, rnd_w:rnd_w+new_w]
+        ovideo = video
+        video = torch.nn.functional.interpolate(
+            video / 255.0, scale_factor=random.random() * 0.3 + 1.0, mode="bilinear"
+        )
+        video = (video * 255.0).type_as(ovideo)
         
     if random_crop == 2:
         ## Random Crop into a Size similar to Square
