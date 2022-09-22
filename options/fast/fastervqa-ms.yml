@@ -1,0 +1,116 @@
+name: FasterVQA-MS
+num_epochs: 30
+l_num_epochs: 0
+warmup_epochs: 2.5
+ema: true
+save_model: true
+batch_size: 16
+num_workers: 6
+
+wandb:
+    project_name: VQA_New_Exp
+
+data:
+    val-kv1k:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/KoNViD/labels.txt
+            data_prefix: ../datasets/KoNViD/
+            sample_types:
+                fragments:
+                    fragments_h: 5
+                    fragments_w: 5
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 8
+                    clip_len: 32
+                    frame_interval: 2
+                    t_frag: 8
+                    num_clips: 1
+                    
+    val-livevqc:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
+            data_prefix: ../datasets/LIVE_VQC/
+            sample_types:
+                fragments:
+                    fragments_h: 5 #7
+                    fragments_w: 5 #7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 8
+                    clip_len: 32 #32
+                    frame_interval: 2
+                    t_frag: 8 #8
+                    num_clips: 1 
+
+
+    val-l1080p:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_1080p.txt
+            data_prefix: ../datasets/LSVQ/
+            sample_types:
+
+                fragments:
+                    fragments_h: 5 #7
+                    fragments_w: 5 #7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 8
+                    clip_len: 32 #32
+                    frame_interval: 2
+                    t_frag: 8 #8
+                    num_clips: 1            
+    val-ltest:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LSVQ/labels_test.txt
+            data_prefix: ../datasets/LSVQ/
+            sample_types:
+
+                fragments:
+                    fragments_h: 5 #7
+                    fragments_w: 5 #7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 8
+                    clip_len: 32
+                    frame_interval: 2
+                    t_frag: 8
+                    num_clips: 1
+
+
+
+
+
+
+model:
+    type: DiViDeAddEvaluator
+    args:
+        backbone:
+            fragments:
+                checkpoint: false
+                pretrained: 
+        backbone_size: swin_tiny_grpb
+        backbone_preserve_keys: fragments
+        divide_head: false
+        vqa_head:
+            in_channels: 768
+            hidden_channels: 64
+            
+optimizer:
+    lr: !!float 1e-3
+    backbone_lr_mult: !!float 1e-1
+    wd: 0.05
+        
+load_path: ../pretrained/swin_tiny_patch244_window877_kinetics400_1k.pth
+test_load_path: ./pretrained_weights/FAST_VQA_3D_1*1.pth
+
+    
+        

@@ -1,4 +1,4 @@
-__version__ = "2.0.0-refactor"
+__version__ = "3.0.0-fastervqa"
 
 
 def parse_version_info(version_str):

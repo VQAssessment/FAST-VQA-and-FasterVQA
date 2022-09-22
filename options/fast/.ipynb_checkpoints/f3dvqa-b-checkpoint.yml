@@ -1,4 +1,4 @@
-name: Space_Time_Unified_FAST(3D)_1*1
+name: FasterVQA
 num_epochs: 30
 l_num_epochs: 0
 warmup_epochs: 2.5
@@ -8,7 +8,7 @@ batch_size: 16
 num_workers: 6
 
 wandb:
-    project_name: VQA_Experiments_2022
+    project_name: VQA_New_Exp
 
 data:
     train:
@@ -23,31 +23,11 @@ data:
                     fragments_w: 7
                     fsize_h: 32
                     fsize_w: 32
-                    aligned: 4
-            clip_len: 32
-            frame_interval: 2
-            t_frag: 8
-            num_clips: 1
-    val-livevqc:
-        type: FusionDataset
-        args:
-            phase: test
-            anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
-            data_prefix: ../datasets/LIVE_VQC/
-            sample_types:
-                #resize:
-                #    size_h: 224
-                #    size_w: 224
-                fragments:
-                    fragments_h: 7
-                    fragments_w: 7
-                    fsize_h: 32
-                    fsize_w: 32
-                    aligned: 4
-            clip_len: 32
-            frame_interval: 2
-            t_frag: 8
-            num_clips: 1
+                    aligned: 8
+                    clip_len: 32
+                    frame_interval: 2
+                    t_frag: 8
+                    num_clips: 1
     val-kv1k:
         type: FusionDataset
         args:
@@ -55,19 +35,36 @@ data:
             anno_file: ./examplar_data_labels/KoNViD/labels.txt
             data_prefix: ../datasets/KoNViD/
             sample_types:
-                #resize:
-                #    size_h: 224
-                #    size_w: 224
                 fragments:
                     fragments_h: 7
                     fragments_w: 7
                     fsize_h: 32
                     fsize_w: 32
-                    aligned: 4
-            clip_len: 32
-            frame_interval: 2
-            t_frag: 8
-            num_clips: 1
+                    aligned: 8
+                    clip_len: 32
+                    frame_interval: 2
+                    t_frag: 8
+                    num_clips: 1
+                    
+    val-livevqc:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
+            data_prefix: ../datasets/LIVE_VQC/
+            sample_types:
+                fragments:
+                    fragments_h: 7 #7
+                    fragments_w: 7 #7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 8
+                    clip_len: 32 #32
+                    frame_interval: 2
+                    t_frag: 8 #8
+                    num_clips: 1 
+
+
             
     val-ltest:
         type: FusionDataset
@@ -76,39 +73,18 @@ data:
             anno_file: ./examplar_data_labels/LSVQ/labels_test.txt
             data_prefix: ../datasets/LSVQ/
             sample_types:
-                #resize:
-                #    size_h: 224
-                #    size_w: 224
+
                 fragments:
-                    fragments_h: 7
-                    fragments_w: 7
+                    fragments_h: 7 #7
+                    fragments_w: 7 #7
                     fsize_h: 32
                     fsize_w: 32
-                    aligned: 4
-            clip_len: 32
-            frame_interval: 2
-            t_frag: 8
-            num_clips: 1
-    val-l1080p:
-        type: FusionDataset
-        args:
-            phase: test
-            anno_file: ./examplar_data_labels/LSVQ/labels_1080p.txt
-            data_prefix: ../datasets/LSVQ/
-            sample_types:
-                #resize:
-                #    size_h: 224
-                #    size_w: 224
-                fragments:
-                    fragments_h: 7
-                    fragments_w: 7
-                    fsize_h: 32
-                    fsize_w: 32
-                    aligned: 4
-            clip_len: 32
-            frame_interval: 2
-            t_frag: 8
-            num_clips: 1
+                    aligned: 8
+                    clip_len: 32 #32
+                    frame_interval: 2
+                    t_frag: 8 #8
+                    num_clips: 1
+
 
 
 

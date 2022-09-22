@@ -1,4 +1,4 @@
-name: FAST-3D-K400
+name: FAST-3D-K400-1
 num_epochs: 30
 l_num_epochs: 0
 warmup_epochs: 2.5
@@ -23,17 +23,17 @@ data:
                     fragments_w: 7
                     fsize_h: 32
                     fsize_w: 32
-                    aligned: 4
+                    aligned: 8
             clip_len: 32
             frame_interval: 2
-            t_frag: 4
+            t_frag: 8
             num_clips: 1
     val:
         type: FusionDatasetK400
         args:
             phase: test
-            anno_file: ../datasets/Kinetics/kinetics-dataset/k400/val_labels.txt
-            data_prefix: ../datasets/Kinetics/kinetics-dataset/k400/val/
+            anno_file: ../datasets/Kinetics/kinetics-dataset/k400/test_labels.txt
+            data_prefix: ../datasets/Kinetics/kinetics-dataset/k400/test/
             sample_types:
                 #resize:
                 #    size_h: 224
@@ -43,7 +43,7 @@ data:
                     fragments_w: 7
                     fsize_h: 32
                     fsize_w: 32
-                    aligned: 4
+                    aligned: 8
             clip_len: 32
             frame_interval: 2
             t_frag: 8
@@ -70,4 +70,4 @@ optimizer:
     wd: 0.05
         
 load_path: ../model_baselines/NetArch/swin_tiny_patch244_window877_kinetics400_1k.pth
-test_load_path: 
+test_load_path: pretrained_weights/FAST-3D-K400-1_val_s_dev_v0.0.pth

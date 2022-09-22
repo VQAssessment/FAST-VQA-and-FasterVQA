@@ -22,7 +22,6 @@ import yaml
 from functools import reduce
 from thop import profile
 import copy
-
 def train_test_split(dataset_path, ann_file, ratio=0.8, seed=42):
     random.seed(seed)
     video_infos = []
@@ -102,7 +101,7 @@ def finetune_epoch(ft_loader, model, model_ema, optimizer, scheduler, device, ep
                    need_upsampled=False, need_feat=False, need_fused=False, need_separate_sup=False):
     model.train()
     for i, data in enumerate(tqdm(ft_loader, desc=f"Training in epoch {epoch}")):
-        optimizer.zero_grad()
+
         video = {}
         for key in sample_types:
             if key in data:
@@ -126,8 +125,10 @@ def finetune_epoch(ft_loader, model, model_ema, optimizer, scheduler, device, ep
         wandb.log({"train/total_loss": loss.item(),})
 
         loss.backward()
-        optimizer.step()
-        scheduler.step()
+        if i % 4 == 0:
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
         
         #ft_loader.dataset.refresh_hypers()
 
@@ -160,8 +161,8 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
     confusion_matrix = torch.zeros(400,400)
     t5_confusion_matrix = torch.zeros(400,400)
     
- 
-    for i, data in enumerate(tqdm(inf_loader, desc="Validating")):
+    pbar = tqdm(inf_loader, desc="Validating")
+    for i, data in enumerate(pbar):
         result = dict()
         video = {}
         for key in sample_types:
@@ -179,6 +180,7 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
         confusion_matrix[y][data["gt_label"]] += 1
         for i in y_sort[:5]:
             t5_confusion_matrix[i][data["gt_label"]] += 1
+        pbar.set_description(f"{(torch.sum(torch.diag(confusion_matrix)) / torch.sum(confusion_matrix))}")
         del video
         # result['frame_inds'] = data['frame_inds']
         # del data
@@ -268,6 +270,11 @@ def main():
                 i_state_dict.pop(key)
             
         print(model.load_state_dict(i_state_dict, strict=False))
+        
+    if "test_load_path" in opt:
+        state_dict = torch.load(opt["test_load_path"], map_location=device)
+        print(state_dict["state_dict"].keys())
+        model.load_state_dict(state_dict["state_dict"])
     
     if opt.get("split_seed", -1) > 0:
         num_splits = 10
@@ -356,6 +363,16 @@ def main():
             bests[key] = 0,0,0
             bests_n[key] = 0,0,0
         
+        
+        for key in val_loaders:
+            bests[key] = inference_set(
+                    val_loaders[key],
+                    model_ema if model_ema is not None else model,
+                    device, bests[key], save_model=opt["save_model"], save_name=opt["name"],
+                    suffix = key+"_s",
+            )
+        print(bests)
+        exit()
 
         for key, value in dict(model.named_children()).items():
             if "backbone" in key:

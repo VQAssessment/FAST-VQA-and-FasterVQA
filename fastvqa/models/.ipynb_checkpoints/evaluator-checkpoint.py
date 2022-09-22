@@ -39,46 +39,7 @@ class BaseEvaluator(nn.Module):
             feat, avg_attns = self.backbone(vclip, require_attn=True)
             score = self.vqa_head(feat)
             return score, avg_attns
-        
-        
-class DiViDeEvaluator(nn.Module):
-    def __init__(
-        self,
-        backbone_size='swin_tiny',
-        backbone=dict(resize={"window_size": (4,4,4)}, fragments={"window_size": (4,4,4)}),
-        vqa_head=dict(in_channels=1536),
-    ):
-        super().__init__()
-        for key in backbone:
-            if backbone_size == 'swin_tiny':
-                b = swin_3d_tiny(**backbone[key])
-            elif backbone_size == 'swin_small':
-                b = swin_3d_small(**backbone[key])
-            else:
-                raise NotImplementedError
-            print(key+"_backbone")
-            setattr(self, key+"_backbone", b)
-        self.vqa_head = VQAHead(**vqa_head)
 
-    def forward(self, vclips, inference=True, **kwargs):
-        if inference:
-            self.eval()
-            with torch.no_grad():
-                
-                feats = []
-                for key in vclips:
-                    feats += [getattr(self, key+"_backbone")(vclips[key])]
-                feat = torch.cat(feats, 1)
-                score = self.vqa_head(feat)
-            self.train()
-            return score
-        else:
-            feats = []
-            for key in vclips:
-                feats += [getattr(self, key+"_backbone")(vclips[key])]
-            feat = torch.cat(feats, 1)
-            score = self.vqa_head(feat)
-            return score
         
 class DiViDeAddEvaluator(nn.Module):
     def __init__(
@@ -144,9 +105,9 @@ class DiViDeAddEvaluator(nn.Module):
                 scores = []
                 feats = {}
                 for key in vclips:
-                    feat = getattr(self, key+"_backbone")(vclips[key], multi=self.multi, **kwargs)
-                    if hasattr(self, key+"_head"):
-                        scores += [getattr(self, key+"_head")(feat)]
+                    feat = getattr(self, key.split("_")[0]+"_backbone")(vclips[key], multi=self.multi, **kwargs)
+                    if hasattr(self, key.split("_")[0]+"_head"):
+                        scores += [getattr(self, key.split("_")[0]+"_head")(feat)]
                     else:
                         scores += [getattr(self, "vqa_head")(feat)]
                     if return_pooled_feats:
@@ -164,9 +125,9 @@ class DiViDeAddEvaluator(nn.Module):
             scores = []
             feats = {}
             for key in vclips:
-                feat = getattr(self, key+"_backbone")(vclips[key], multi=self.multi, **kwargs)
-                if hasattr(self, key+"_head"):
-                    scores += [getattr(self, key+"_head")(feat)]
+                feat = getattr(self, key.split("_")[0]+"_backbone")(vclips[key], multi=self.multi, **kwargs)
+                if hasattr(self, key.split("_")[0]+"_head"):
+                    scores += [getattr(self, key.split("_")[0]+"_head")(feat)]
                 else:
                     scores += [getattr(self, "vqa_head")(feat)]
                 if return_pooled_feats:

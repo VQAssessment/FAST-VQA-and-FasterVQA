@@ -31,6 +31,7 @@ def get_spatial_fragments(
     random=False,
     random_upsample=False,
     fallback_type="upsample",
+    **kwargs,
 ):
     size_h = fragments_h * fsize_h
     size_w = fragments_w * fsize_w
@@ -220,6 +221,7 @@ def get_spatial_samples(
     sample_types={"resize": {}, "fragments": {}}, ## resize | arp_resize | crop | fragments
 ):
     if random_crop == 1:
+        print("Alert!")
         ## Random Crop but keep the ARP
         res_h, res_w = video.shape[-2:]
         rnd_ratio = random.random() * 0.2 + 0.8
@@ -241,13 +243,50 @@ def get_spatial_samples(
         rnd_h = random.randrange(res_h - new_h)
         rnd_w = random.randrange(res_w - new_w)
         video = video[..., rnd_h:rnd_h+new_h, rnd_w:rnd_w+new_w]
-        
     sampled_video = {}
     for sample_type, arg in sample_types.items():
         sampled_video[sample_type] = get_single_sample(video, sample_type, 
                                                        **arg)
     return sampled_video
 
+
+def get_spatial_and_temporal_samples(
+    video_path,
+    sample_types,
+    samplers,
+    is_train=False,
+):
+    video = {}
+    if video_path.endswith(".yuv"):
+            ## This is only an adaptation to LIVE-Qualcomm
+        ovideo = skvideo.io.vread(video_path, 1080, 1920, inputdict={'-pix_fmt':'yuvj420p'})
+        for stype in self.samplers:
+            frame_inds = self.samplers[stype](ovideo.shape[0], is_train)
+            imgs = [torch.from_numpy(video[idx]) for idx in frame_inds]
+            video[stype] = torch.stack(imgs, 0).permute(3, 0, 1, 2)
+    else:
+        vreader = VideoReader(video_path)
+        ### Avoid duplicated video decoding!!! Important!!!!
+        all_frame_inds = []
+        frame_inds = {}
+        for stype in samplers:
+            frame_inds[stype] = samplers[stype](len(vreader), is_train)
+            all_frame_inds.append(frame_inds[stype])
+            
+        ### Each frame is only decoded one time!!!
+        all_frame_inds = np.concatenate(all_frame_inds,0)
+        frame_dict = {idx: vreader[idx] for idx in np.unique(all_frame_inds)}
+        
+        for stype in samplers:
+            imgs = [frame_dict[idx] for idx in frame_inds[stype]]
+            video[stype] = torch.stack(imgs, 0).permute(3, 0, 1, 2)
+
+    sampled_video = {}
+    for stype, sopt in sample_types.items():
+        sampled_video[stype] = get_single_sample(video[stype], stype, 
+                                                       **sopt)
+    return sampled_video, frame_inds
+        
 
 class SampleFrames:
     def __init__(self, clip_len, frame_interval=1, num_clips=1):
@@ -463,11 +502,13 @@ class FusionDataset(torch.utils.data.Dataset):
         self.crop = opt.get("random_crop", False)
         self.mean = torch.FloatTensor([123.675, 116.28, 103.53])
         self.std = torch.FloatTensor([58.395, 57.12, 57.375])
-        if "t_frag" not in opt:
-            self.sampler = SampleFrames(opt["clip_len"], opt["frame_interval"], opt["num_clips"])
-        else:
-            self.sampler = FragmentSampleFrames(opt["clip_len"] // opt["t_frag"], opt["t_frag"], opt["frame_interval"], opt["num_clips"])
-        print(self.sampler(240, self.phase == "train"))
+        self.samplers = {}
+        for stype, sopt in opt["sample_types"].items():
+            if "t_frag" not in sopt:
+                self.samplers[stype] = SampleFrames(sopt["clip_len"], sopt["frame_interval"], sopt["num_clips"])
+            else:
+                self.samplers[stype] = FragmentSampleFrames(sopt["clip_len"] // sopt["t_frag"], sopt["t_frag"], sopt["frame_interval"], sopt["num_clips"])
+            print(stype+" branch sampled frames:", self.samplers[stype](240, self.phase == "train"))
         
         if isinstance(self.ann_file, list):
             self.video_infos = self.ann_file
@@ -519,27 +560,19 @@ class FusionDataset(torch.utils.data.Dataset):
         
 
         ## Read Original Frames
-        if filename.endswith(".yuv"):
-            ## This is only an adaptation to LIVE-Qualcomm
-            video = skvideo.io.vread(filename, 1080, 1920, inputdict={'-pix_fmt':'yuvj420p'})
-            frame_inds = self.sampler(video.shape[0], self.phase == "train")
-            imgs = [torch.from_numpy(video[idx]) for idx in frame_inds]
-        else:
-            vreader = VideoReader(filename)
-            frame_inds = self.sampler(len(vreader), self.phase == "train")
-            frame_dict = {idx: vreader[idx] for idx in np.unique(frame_inds)}
-            imgs = [frame_dict[idx] for idx in frame_inds]
-        img_shape = imgs[0].shape
-        video = torch.stack(imgs, 0)
-        video = video.permute(3, 0, 1, 2)
         ## Process Frames
-        data = get_spatial_samples(video,
-                                   self.crop,
+        data, frame_inds = get_spatial_and_temporal_samples(filename,
                                    self.sample_types,
+                                   self.samplers,
+                                   self.phase == "train",
                                   )
+        
         for k, v in data.items():
             data[k] = ((v.permute(1, 2, 3, 0) - self.mean) / self.std).permute(3, 0, 1, 2)
-        data["num_clips"] =  self.opt["num_clips"]
+         
+        data["num_clips"] = {}
+        for stype, sopt in self.sample_types.items():
+            data["num_clips"][stype] = sopt["num_clips"]
         data["frame_inds"] = frame_inds
         data["gt_label"] = label
         data["name"] = osp.basename(video_info["filename"])

@@ -49,6 +49,19 @@ def global_position_index(
     )  # Wd*Wh*Ww, Wd*Wh*Ww, 3
     return relative_coords  # relative_coords
 
+@lru_cache
+def get_adaptive_window_size(
+    base_window_size,
+    input_x_size,
+    base_x_size,
+):
+    tw, hw, ww = base_window_size
+    tx_, hx_, wx_ = input_x_size
+    tx, hx, wx = base_x_size
+    print((tw * tx_) // tx, (hw * hx_) // hx, (ww * wx_) // wx)
+    return (tw * tx_) // tx, (hw * hx_) // hx, (ww * wx_) // wx
+    
+
 
 class Mlp(nn.Module):
     """Multilayer perceptron."""
@@ -436,9 +449,8 @@ class SwinTransformerBlock3D(nn.Module):
             self.finfo_windows = window_partition(shifted_finfo, window_size)
         # W-MSA/SW-MSA
         # print(shift_size)
-        #print("Before Attention", window_size)
         gpi = global_position_index(
-            Dp, Hp, Wp, window_size=window_size, shift_size=shift_size, device=x.device
+            Dp, Hp, Wp, fragments=(1,) + window_size[1:], window_size=window_size, shift_size=shift_size, device=x.device,
         )
         attn_windows = self.attn(
             x_windows, mask=attn_mask, fmask=gpi, resized_window_size=window_size if resized_window_size is not None else None,
@@ -752,6 +764,7 @@ class SwinTransformer3D(nn.Module):
         use_checkpoint=True,
         jump_attention=[False, False, False, False],
         frag_biases=[True, True, True, False],
+        base_x_size=(32, 224, 224),
     ):
         super().__init__()
 
@@ -763,6 +776,7 @@ class SwinTransformer3D(nn.Module):
         self.frozen_stages = frozen_stages
         self.window_size = window_size
         self.patch_size = patch_size
+        self.base_x_size = base_x_size
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed3D(
@@ -1016,15 +1030,24 @@ class SwinTransformer3D(nn.Module):
             self.apply(_init_weights)
         else:
             raise TypeError("pretrained must be a str or None")
+            
+    
 
-    def forward(self, x, multi=False, resized_window_size=(4,7,7)):
+    def forward(self, x, multi=False, adaptive_window_size=False):
+        
         """Forward function."""
+        if adaptive_window_size:
+            resized_window_size = get_adaptive_window_size(self.window_size, x.shape[2:], self.base_x_size)
+        else:
+            resized_window_size = None
+        
         x = self.patch_embed(x)
 
         x = self.pos_drop(x)
 
         if multi:
             feats = [x]
+            
 
         for layer in self.layers:
             x = layer(x.contiguous(), resized_window_size)

@@ -25,9 +25,9 @@ data:
                     fsize_h: 32
                     fsize_w: 32
                     aligned: 32
-            clip_len: 32
-            frame_interval: 2
-            num_clips: 1
+                    clip_len: 32
+                    frame_interval: 2
+                    num_clips: 1
     val:
         type: FusionDataset
         args:
@@ -35,18 +35,15 @@ data:
             anno_file: ./examplar_data_labels/KoNViD/labels.txt
             data_prefix: ../datasets/KoNViD/
             sample_types:
-                #resize:
-                #    size_h: 224
-                #    size_w: 224
                 fragments:
                     fragments_h: 7
                     fragments_w: 7
                     fsize_h: 32
                     fsize_w: 32
                     aligned: 32
-            clip_len: 32
-            frame_interval: 2
-            num_clips: 4
+                    clip_len: 32
+                    frame_interval: 2
+                    num_clips: 4
 
 
 

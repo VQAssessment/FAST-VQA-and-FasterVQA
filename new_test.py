@@ -24,8 +24,10 @@ from thop import profile
 
 def rescale(pr, gt=None):
     if gt is None:
+        print(np.mean(pr), np.std(pr))
         pr = (pr - np.mean(pr)) / np.std(pr)
     else:
+        print(np.mean(pr), np.std(pr), np.std(gt), np.mean(gt))
         pr = ((pr - np.mean(pr)) / np.std(pr)) * np.std(gt) + np.mean(gt)
     return pr
 
@@ -38,7 +40,7 @@ def profile_inference(inf_set, model, device):
         if key in data:
             video[key] = data[key].to(device)
             c, t, h, w = video[key].shape
-            video[key] = video[key].reshape(1, c, data["num_clips"], t // data["num_clips"], h, w).permute(0,2,1,3,4,5).reshape( data["num_clips"], c, t // data["num_clips"], h, w) 
+            video[key] = video[key].reshape(1, c, data["num_clips"][key], t // data["num_clips"][key], h, w).permute(0,2,1,3,4,5).reshape( data["num_clips"][key], c, t // data["num_clips"][key], h, w) 
     with torch.no_grad():
         flops, params = profile(model, (video, ))
     print(f"The FLOps of the Variant is {flops/1e9:.1f}G, with Params {params/1e6:.2f}M.")
@@ -56,18 +58,26 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
             if key in data:
                 video[key] = data[key].to(device)
                 b, c, t, h, w = video[key].shape
-                video[key] = video[key].reshape(b, c, data["num_clips"], t // data["num_clips"], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"], c, t // data["num_clips"], h, w) 
+                video[key] = video[key].reshape(b, c, data["num_clips"][key], t // data["num_clips"][key], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"][key], c, t // data["num_clips"][key], h, w) 
         with torch.no_grad():
-            result["pr_labels"] = np.mean(model(video).cpu().numpy())
+            labels = model(video,reduce_scores=False)
+            labels = [np.mean(l.cpu().numpy()) for l in labels]
+            result["pr_labels"] = labels
         result["gt_label"] = data["gt_label"].item()
         result["name"] = data["name"]
         # result['frame_inds'] = data['frame_inds']
         # del data
         results.append(result)
 
+    
     ## generate the demo video for video quality localization
     gt_labels = [r["gt_label"] for r in results]
-    pr_labels = [np.mean(r["pr_labels"]) for r in results]
+    pr_labels = 0
+    weights = [0.3, 0.7]
+    for i, w in zip(range(len(results[0]["pr_labels"])), weights):
+        print(i, w)
+        pr_labels += rescale([np.mean(r["pr_labels"][i]) for r in results]) * w
+        
     pr_labels = rescale(pr_labels, gt_labels)
 
     s = spearmanr(gt_labels, pr_labels)[0]
@@ -128,6 +138,28 @@ def main():
     model = getattr(models, opt["model"]["type"])(**opt["model"]["args"]).to(device)
 
     state_dict = torch.load(opt["test_load_path"], map_location=device)["state_dict"]
+    
+    if "test_load_path_aux" in opt:
+        new_state_dict = torch.load(opt["test_load_path_aux"], map_location=device)["state_dict"]
+        
+        from collections import OrderedDict
+        
+        fusion_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            if k.startswith("vqa_head"):
+                ki = k.replace("vqa", "fragments")
+            else:
+                ki = k
+            fusion_state_dict[ki] = v
+            
+        for k, v in new_state_dict.items():
+            if k.startswith("vqa_head"):
+                ki = k.replace("vqa", "resize")
+            else:
+                ki = k
+            fusion_state_dict[ki] = v
+        
+        state_dict = fusion_state_dict
 
     model.load_state_dict(state_dict, strict=True)
     
@@ -152,9 +184,9 @@ def main():
 
 
 
-        #profile_inference(val_dataset, model, device)    
+        profile_inference(val_dataset, model, device)    
 
-        # finetune the model
+        # test the model
         print(len(val_loader))
 
         best_ = -1, -1, -1, 1000

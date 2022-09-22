@@ -29,7 +29,7 @@ data:
                 resize:
                     size_h: 224
                     size_w: 224
-            clip_len: 32
+            clip_len: 16
             frame_interval: 2
             num_clips: 1
     val:
@@ -48,9 +48,9 @@ data:
                 resize:
                     size_h: 224
                     size_w: 224
-            clip_len: 32
+            clip_len: 16
             frame_interval: 2
-            num_clips: 4
+            num_clips: 1
         
 model:
     type: DiViDeAddEvaluator

@@ -95,7 +95,7 @@ sample_types=["resize", "fragments", "crop", "arp_resize", "arp_fragments"]
 
 
 def finetune_epoch(ft_loader, model, model_ema, optimizer, scheduler, device, epoch=-1, 
-                   need_upsampled=False, need_feat=False, need_fused=False, need_separate_sup=False):
+                   need_upsampled=True, need_feat=True, need_fused=False, need_separate_sup=False):
     model.train()
     for i, data in enumerate(tqdm(ft_loader, desc=f"Training in epoch {epoch}")):
         optimizer.zero_grad()
@@ -249,12 +249,12 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
                 video[key] = data[key].to(device)
                 ## Reshape into clips
                 b, c, t, h, w = video[key].shape
-                video[key] = video[key].reshape(b, c, data["num_clips"], t // data["num_clips"], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"], c, t // data["num_clips"], h, w) 
+                video[key] = video[key].reshape(b, c, data["num_clips"][key], t // data["num_clips"][key], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"][key], c, t // data["num_clips"][key], h, w) 
             if key + "_up" in data:
                 video_up[key] = data[key+"_up"].to(device)
                 ## Reshape into clips
                 b, c, t, h, w = video_up[key].shape
-                video_up[key] = video_up[key].reshape(b, c, data["num_clips"], t // data["num_clips"], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"], c, t // data["num_clips"], h, w) 
+                video_up[key] = video_up[key].reshape(b, c, data["num_clips"][key], t // data["num_clips"][key], h, w).permute(0,2,1,3,4,5).reshape(b * data["num_clips"][key], c, t // data["num_clips"][key], h, w) 
             #.unsqueeze(0)
         with torch.no_grad():
             result["pr_labels"] = model(video).cpu().numpy()
@@ -362,12 +362,6 @@ def main():
         num_splits = 1
         
     for split in range(num_splits):
-        
-        if opt.get("split_seed", -1) > 0:
-            split_duo = train_test_split(opt["data"]["train"]["args"]["data_prefix"],
-                                         opt["data"]["train"]["args"]["anno_file"], 
-                                         seed=opt["split_seed"] * split)
-            opt["data"]["train"]["args"]["anno_file"], opt["data"]["val"]["args"]["anno_file"] = split_duo
 
         train_datasets = {}
         for key in opt["data"]:
