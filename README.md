@@ -16,7 +16,9 @@ An Open Source Deep End-to-End Video Quality Assessment Toolbox,
 
 暨 可复现 ECCV2022 论文 [FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling](https://arxiv.org/abs/2207.02595v1) 的代码。
 
-:sparkles: We are officially announcing FasterVQA (named FAST-VQA-B-3D during development) which expands the proposed Fragments into a 3D version, which brings 4x faster speed and similar performance. The preprint paper related to FasterVQA will be made public soon.
+:sparkles: We are officially announcing FasterVQA (named FAST-VQA-B-3D during development) which expands the proposed Fragments into a 3D version, which brings 4x faster speed and similar performance. The preprint version of the extension of the ECCV2022 paper which proposed FasterVQA will be made public soon. The official CVF edition of ECCV paper will also be online soon as the conference is coming.
+
+我们正式发布了新版的FasterVQA，在效率提升4倍的情况下保持接近原始FAST-VQA的性能。对应的，我们ECCV论文的扩展版也将很快发布预印版本。
 
 In this release, we have refactored the training and testing code. The refactored code can achieve the same performance as the original version and allow modification of (1) the backbone structures; (2) the sampling hyper-parameters; (3) loss functions.
 
@@ -35,7 +37,8 @@ python vqa.py -d [YOUR_INPUT_FILE_PATH]
 The default one is for a video in KoNViD-1k with FasterVQA, which should get a score around 0.133.
 
 ## See our Weights & Biases training logs
-我们公开了训练曲线！
+
+我们在Wandb上公开了一部分训练和测试曲线。
 
 We are reproducing several experiments and making public our training logs here.
 
