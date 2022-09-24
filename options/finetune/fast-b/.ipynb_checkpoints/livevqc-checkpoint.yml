@@ -26,9 +26,9 @@ data:
                     fsize_h: 32
                     fsize_w: 32
                     aligned: 32
-            clip_len: 32
-            frame_interval: 2
-            num_clips: 1
+                    clip_len: 32
+                    frame_interval: 2
+                    num_clips: 1
     val:
         type: FusionDataset
         args:
