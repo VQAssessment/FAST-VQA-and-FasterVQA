@@ -44,7 +44,7 @@ class BaseEvaluator(nn.Module):
 class DiViDeAddEvaluator(nn.Module):
     def __init__(
         self,
-        backbone_size='swin_tiny',
+        backbone_size="divided",
         backbone_preserve_keys = 'fragments,resize',
         multi=False,
         backbone=dict(resize={"window_size": (4,4,4)}, fragments={"window_size": (4,4,4)}),
@@ -55,24 +55,28 @@ class DiViDeAddEvaluator(nn.Module):
         backbone_preserve_keys = backbone_preserve_keys.split(",")
         self.multi = multi
         super().__init__()
-        for key in backbone:
+        for key, hypers in backbone.items():
+            print(backbone_size)
             if key not in backbone_preserve_keys:
                 continue
-
-            if backbone_size == 'swin_tiny':
+            if backbone_size=="divided":
+                t_backbone_size = hypers["type"]
+            else:
+                t_backbone_size = backbone_size
+            if t_backbone_size == 'swin_tiny':
                 b = swin_3d_tiny(**backbone[key])
-            elif backbone_size == 'swin_tiny_grpb':
+            elif t_backbone_size == 'swin_tiny_grpb':
                 # to reproduce fast-vqa
                 b = VideoBackbone()
-            elif backbone_size == 'swin_tiny_grpb_m':
+            elif t_backbone_size == 'swin_tiny_grpb_m':
                 # to reproduce fast-vqa-m
                 b = VideoBackbone(window_size=(4,4,4), frag_biases=[0,0,0,0])
-            elif backbone_size == 'swin_small':
+            elif t_backbone_size == 'swin_small':
                 b = swin_3d_small(**backbone[key])
-            elif backbone_size == 'conv_tiny':
+            elif t_backbone_size == 'conv_tiny':
                 print(backbone_size)
                 b = convnext_3d_tiny(pretrained=True)
-            elif backbone_size == 'conv_small':
+            elif t_backbone_size == 'conv_small':
                 b = convnext_3d_small(pretrained=True)
             else:
                 raise NotImplementedError
