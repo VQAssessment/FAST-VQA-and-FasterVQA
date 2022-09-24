@@ -140,7 +140,7 @@ def main():
     state_dict = torch.load(opt["test_load_path"], map_location=device)["state_dict"]
     
     if "test_load_path_aux" in opt:
-        new_state_dict = torch.load(opt["test_load_path_aux"], map_location=device)["state_dict"]
+        aux_state_dict = torch.load(opt["test_load_path_aux"], map_location=device)["state_dict"]
         
         from collections import OrderedDict
         
@@ -152,7 +152,9 @@ def main():
                 ki = k
             fusion_state_dict[ki] = v
             
-        for k, v in new_state_dict.items():
+        for k, v in aux_state_dict.items():
+            if k.startswith("frag"):
+                continue
             if k.startswith("vqa_head"):
                 ki = k.replace("vqa", "resize")
             else:

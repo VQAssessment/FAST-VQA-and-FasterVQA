@@ -395,7 +395,36 @@ def main():
             reinit=True,
         )
         
-        if "load_path" in opt:
+        if "load_path_aux" in opt:
+            state_dict = torch.load(opt["load_path"], map_location=device)["state_dict"]
+            aux_state_dict = torch.load(opt["load_path_aux"], map_location=device)["state_dict"]
+
+            from collections import OrderedDict
+
+            fusion_state_dict = OrderedDict()
+            for k, v in state_dict.items():
+                if "head" in k:
+                    continue
+                if k.startswith("vqa_head"):
+                    ki = k.replace("vqa", "fragments")
+                else:
+                    ki = k
+                fusion_state_dict[ki] = v
+
+            for k, v in aux_state_dict.items():
+                if "head" in k:
+                    continue
+                if k.startswith("frag"):
+                    continue
+                if k.startswith("vqa_head"):
+                    ki = k.replace("vqa", "resize")
+                else:
+                    ki = k
+                fusion_state_dict[ki] = v
+            state_dict = fusion_state_dict
+            print(model.load_state_dict(state_dict))
+        
+        elif "load_path" in opt:
             state_dict = torch.load(opt["load_path"], map_location=device)
 
             if "state_dict" in state_dict:
