@@ -1,5 +1,22 @@
 # :1st_place_medal:FAST-VQA/FasterVQA
 
+- 12 Oct, 2022: Release of pre-print FasterVQA paper: [PDF](arxiv.org/pdf/2210.05357), [Abstract](arxiv.org/abs/2210.05357).
+- 27 Sep, 2022: Release of FasterVQA models: 4X more efficient, 14X real-time inference on Apple M1 CPU (for FasterVQA-MT, tested on my old Mac).
+- 10 Sep, 2022: Support on Adaptive Multi-scale Inference (AMI): one model for different scales of inputs.
+
+Performances for FasterVQA:
+
+	
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/neighbourhood-representative-sampling-for/video-quality-assessment-on-konvid-1k)](https://paperswithcode.com/sota/video-quality-assessment-on-konvid-1k?p=neighbourhood-representative-sampling-for)
+	
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/neighbourhood-representative-sampling-for/video-quality-assessment-on-youtube-ugc)](https://paperswithcode.com/sota/video-quality-assessment-on-youtube-ugc?p=neighbourhood-representative-sampling-for)
+	
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/neighbourhood-representative-sampling-for/video-quality-assessment-on-live-fb-lsvq)](https://paperswithcode.com/sota/video-quality-assessment-on-live-fb-lsvq?p=neighbourhood-representative-sampling-for)
+	
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/neighbourhood-representative-sampling-for/video-quality-assessment-on-live-vqc)](https://paperswithcode.com/sota/video-quality-assessment-on-live-vqc?p=neighbourhood-representative-sampling-for)
+
+Performances for FAST-VQA:
+
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/fast-vqa-efficient-end-to-end-video-quality/video-quality-assessment-on-konvid-1k)](https://paperswithcode.com/sota/video-quality-assessment-on-konvid-1k?p=fast-vqa-efficient-end-to-end-video-quality)
 	
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/fast-vqa-efficient-end-to-end-video-quality/video-quality-assessment-on-live-fb-lsvq)](https://paperswithcode.com/sota/video-quality-assessment-on-live-fb-lsvq?p=fast-vqa-efficient-end-to-end-video-quality)
@@ -16,9 +33,9 @@ An Open Source Deep End-to-End Video Quality Assessment Toolbox,
 
 暨 可复现 ECCV2022 论文 [FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling](https://arxiv.org/abs/2207.02595v1) 的代码。
 
-:sparkles: We are officially announcing FasterVQA (named FAST-VQA-B-3D during development) which expands the proposed Fragments into a 3D version, which brings 4x faster speed and similar performance. The preprint version of the extension of the ECCV2022 paper which proposed FasterVQA will be made public soon. The official CVF edition of ECCV paper will also be online soon as the conference is coming.
+:sparkles: We are officially announcing FasterVQA (named FAST-VQA-B-3D during development) which expands the proposed Fragments into a 3D version, which brings 4x faster speed and similar performance. The official CVF edition of ECCV paper will also be online soon as the conference is coming.
 
-我们正式发布了新版的FasterVQA，在效率提升4倍的情况下保持接近原始FAST-VQA的性能。对应的，我们ECCV论文的扩展版也将很快发布预印版本。
+我们正式发布了新版的FasterVQA，在效率提升4倍的情况下保持接近原始FAST-VQA的性能。
 
 In this release, we have refactored the training and testing code. The refactored code can achieve the same performance as the original version and allow modification of (1) the backbone structures; (2) the sampling hyper-parameters; (3) loss functions.
 
@@ -56,6 +73,7 @@ Now supports:
 数据预处理
 
 Please view [Data Processing](./fastvqa/datasets/fusion_datasets.py) to see the source codes for data processing.
+*Specially, look at the FusionDataset class and the get_spatial_and_temporal_samples function for our core transformations.*
 
 #### Spatial Sampling
 空间采样
