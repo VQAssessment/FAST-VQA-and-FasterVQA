@@ -1,5 +1,7 @@
 # :1st_place_medal:FAST-VQA/FasterVQA
 
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=TimothyHTimothy/FAST-VQA-and-FasterVQA) 
+
 - 12 Oct, 2022: Release of pre-print FasterVQA paper: [PDF](arxiv.org/pdf/2210.05357), [Abstract](arxiv.org/abs/2210.05357).
 - 27 Sep, 2022: Release of FasterVQA models: 4X more efficient, 14X real-time inference on Apple M1 CPU (for FasterVQA-MT, tested on my old Mac).
 - 10 Sep, 2022: Support on Adaptive Multi-scale Inference (AMI): one model for different scales of inputs.
@@ -29,7 +31,7 @@ An Open Source Deep End-to-End Video Quality Assessment Toolbox,
 
 开源的端到端视频质量评价工具箱，
 
-& Reproducible Code for ECCV2022 Paper [FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling](https://arxiv.org/abs/2207.02595v1).
+& Reproducible Code for ECCV2022 Paper [FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling](https://arxiv.org/abs/2207.02595v1) and its extension Paper [Neighbourhood Representative Sampling for Efficient End-to-end Video Quality Assessment](https://arxiv.org/abs/2210.05357).
 
 暨 可复现 ECCV2022 论文 [FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling](https://arxiv.org/abs/2207.02595v1) 的代码。
 
