@@ -2,6 +2,7 @@
 
 ![visitors](https://visitor-badge.laobi.icu/badge?page_id=TimothyHTimothy/FAST-VQA-and-FasterVQA) 
 
+- 10 Nov, 2022: Release of the [ECVA official version](https://www.ecva.net/papers/eccv_2022/papers_ECCV/html/1225_ECCV_2022_paper.php), and our future work DOVER based on FAST-VQA with even better performance: [PDF](arxiv.org/pdf/2211.04894), [abstract](arxiv.org/abs/2211.04894).
 - 12 Oct, 2022: Release of pre-print FasterVQA paper: [PDF](arxiv.org/pdf/2210.05357), [Abstract](arxiv.org/abs/2210.05357).
 - 27 Sep, 2022: Release of FasterVQA models: 4X more efficient, 14X real-time inference on Apple M1 CPU (for FasterVQA-MT, tested on my old Mac).
 - 10 Sep, 2022: Support on Adaptive Multi-scale Inference (AMI): one model for different scales of inputs.
