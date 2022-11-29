@@ -54,12 +54,12 @@ if __name__ == "__main__":
     for sample_type, sample_args in s_data_opt.items():
         ## Sample Temporally
         if t_data_opt.get("t_frag",1) > 1:
-            sampler = FragmentSampleFrames(fsize_t=t_data_opt["clip_len"] // t_data_opt.get("t_frag",1),
-                                           fragments_t=t_data_opt.get("t_frag",1),
-                                           num_clips=t_data_opt.get("num_clips",1),
+            sampler = FragmentSampleFrames(fsize_t=sample_args["clip_len"] // sample_args.get("t_frag",1),
+                                           fragments_t=sample_args.get("t_frag",1),
+                                           num_clips=sample_args.get("num_clips",1),
                                           )
         else:
-            sampler = SampleFrames(clip_len = t_data_opt["clip_len"], num_clips = t_data_opt["num_clips"])
+            sampler = SampleFrames(clip_len = sample_args["clip_len"], num_clips = sample_args["num_clips"])
         frames = sampler(len(video_reader))
         print("Sampled frames are", frames)
         frame_dict = {idx: video_reader[idx] for idx in np.unique(frames)}

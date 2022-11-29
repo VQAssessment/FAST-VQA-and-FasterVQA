@@ -8,6 +8,7 @@ import torch, torchvision
 from tqdm import tqdm
 import cv2
 
+from functools import lru_cache
 
 import random
 import copy
@@ -19,6 +20,7 @@ random.seed(42)
 decord.bridge.set_bridge("torch")
 
 
+    
 
 def get_spatial_fragments(
     video,
@@ -123,17 +125,32 @@ def get_spatial_fragments(
     # target_video = target_video.reshape((-1, dur_t,) + size) ## Splicing Fragments
     return target_video
 
+
+@lru_cache
+def get_resize_function(size_h, size_w, target_ratio=1, random_crop=False):
+    if random_crop:
+        return torchvision.transforms.RandomResizedCrop((size_h, size_w), scale=(0.40,1.0))
+    if target_ratio > 1:
+        size_h = int(target_ratio * size_w)
+        assert size_h > size_w
+    elif target_ratio < 1:
+        size_w = int(size_h / target_ratio)
+        assert size_w > size_h
+    return torchvision.transforms.Resize((size_h, size_w))
+
 def get_resized_video(
     video,
     size_h=224,
     size_w=224,
+    random_crop=False,
+    arp=False,
     **kwargs,
 ):
-    ovideo = video
-    video = torch.nn.functional.interpolate(
-        video / 255.0, size=(size_h, size_w), mode="bilinear"
-    )
-    video = (video * 255.0).type_as(ovideo)
+    video = video.permute(1,0,2,3)
+    resize_opt = get_resize_function(size_h, size_w, 
+                                     video.shape[-2] / video.shape[-1] if arp else 1,
+                                     random_crop)
+    video = resize_opt(video).permute(1,0,2,3)
     return video
 
 def get_arp_resized_video(
@@ -212,6 +229,8 @@ def get_single_sample(
         video = get_arp_fragment_video(video, **kwargs)
     elif sample_type.startswith("crop"):
         video = get_cropped_video(video, **kwargs)
+    elif sample_type == "original":
+        return video
         
     return video
 
@@ -255,15 +274,18 @@ def get_spatial_and_temporal_samples(
     sample_types,
     samplers,
     is_train=False,
+    augment=False,
 ):
     video = {}
     if video_path.endswith(".yuv"):
-            ## This is only an adaptation to LIVE-Qualcomm
+        print("This part will be deprecated due to large memory cost.")
+        ## This is only an adaptation to LIVE-Qualcomm
         ovideo = skvideo.io.vread(video_path, 1080, 1920, inputdict={'-pix_fmt':'yuvj420p'})
-        for stype in self.samplers:
-            frame_inds = self.samplers[stype](ovideo.shape[0], is_train)
-            imgs = [torch.from_numpy(video[idx]) for idx in frame_inds]
+        for stype in samplers:
+            frame_inds = samplers[stype](ovideo.shape[0], is_train)
+            imgs = [torch.from_numpy(ovideo[idx]) for idx in frame_inds]
             video[stype] = torch.stack(imgs, 0).permute(3, 0, 1, 2)
+        del ovideo
     else:
         vreader = VideoReader(video_path)
         ### Avoid duplicated video decoding!!! Important!!!!
@@ -488,12 +510,14 @@ class FusionDataset(torch.utils.data.Dataset):
         
         super().__init__()
         
+        
         self.video_infos = []
         self.ann_file = opt["anno_file"]
         self.data_prefix = opt["data_prefix"]
         self.opt = opt
         self.sample_types = opt["sample_types"]
         self.data_backend = opt.get("data_backend", "disk")
+        self.augment = opt.get("augment", False)
         if self.data_backend == "petrel":
             from petrel_client import client
             self.client = client.Client(enable_mc=True)
@@ -505,7 +529,8 @@ class FusionDataset(torch.utils.data.Dataset):
         self.samplers = {}
         for stype, sopt in opt["sample_types"].items():
             if "t_frag" not in sopt:
-                self.samplers[stype] = SampleFrames(sopt["clip_len"], sopt["frame_interval"], sopt["num_clips"])
+                # revised legacy temporal sampling
+                self.samplers[stype] = FragmentSampleFrames(sopt["clip_len"], sopt["num_clips"], sopt["frame_interval"])
             else:
                 self.samplers[stype] = FragmentSampleFrames(sopt["clip_len"] // sopt["t_frag"], sopt["t_frag"], sopt["frame_interval"], sopt["num_clips"])
             print(stype+" branch sampled frames:", self.samplers[stype](240, self.phase == "train"))
@@ -561,11 +586,9 @@ class FusionDataset(torch.utils.data.Dataset):
 
         ## Read Original Frames
         ## Process Frames
-        data, frame_inds = get_spatial_and_temporal_samples(filename,
-                                   self.sample_types,
-                                   self.samplers,
-                                   self.phase == "train",
-                                  )
+        data, frame_inds = get_spatial_and_temporal_samples(filename, self.sample_types, self.samplers, 
+                                                            self.phase == "train", self.augment and (self.phase == "train"),
+                                                           )
         
         for k, v in data.items():
             data[k] = ((v.permute(1, 2, 3, 0) - self.mean) / self.std).permute(3, 0, 1, 2)
