@@ -24,7 +24,7 @@ from thop import profile
 
 def rescale(pr, gt=None):
     if gt is None:
-        print(np.mean(pr), np.std(pr))
+        print("mean", np.mean(pr), "std", np.std(pr))
         pr = (pr - np.mean(pr)) / np.std(pr)
     else:
         print(np.mean(pr), np.std(pr), np.std(gt), np.mean(gt))
@@ -32,6 +32,7 @@ def rescale(pr, gt=None):
     return pr
 
 sample_types=["resize", "fragments", "crop", "arp_resize", "arp_fragments"]
+
 
 def profile_inference(inf_set, model, device):
     video = {}
@@ -45,16 +46,20 @@ def profile_inference(inf_set, model, device):
         flops, params = profile(model, (video, ))
     print(f"The FLOps of the Variant is {flops/1e9:.1f}G, with Params {params/1e6:.2f}M.")
 
-def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'):
-
+def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s', set_name="na"):
+    print(f"Validating for {set_name}.")
     results = []
 
     best_s, best_p, best_k, best_r = best_
+    
+    keys = []
 
     for i, data in enumerate(tqdm(inf_loader, desc="Validating")):
         result = dict()
         video = {}
         for key in sample_types:
+            if key not in keys:
+                keys.append(key)
             if key in data:
                 video[key] = data[key].to(device)
                 b, c, t, h, w = video[key].shape
@@ -73,10 +78,15 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
     ## generate the demo video for video quality localization
     gt_labels = [r["gt_label"] for r in results]
     pr_labels = 0
-    weights = [0.3, 0.7]
-    for i, w in zip(range(len(results[0]["pr_labels"])), weights):
-        print(i, w)
-        pr_labels += rescale([np.mean(r["pr_labels"][i]) for r in results]) * w
+    pr_dict = {}
+    for i, key in zip(range(len(results[0]["pr_labels"])), keys):
+        key_pr_labels = np.array([np.mean(r["pr_labels"][i]) for r in results])
+        pr_dict[key] = key_pr_labels
+        pr_labels += rescale(key_pr_labels)
+        
+       
+    with open(f"dover_predictions/{set_name}.pkl", "wb") as f:
+        pickle.dump(pr_dict, f)
         
     pr_labels = rescale(pr_labels, gt_labels)
 
@@ -88,7 +98,10 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
     
     results = sorted(results, key=lambda x: x["pr_labels"])
 
-    wandb.log({f"val/SRCC-{suffix}": s, f"val/PLCC-{suffix}": p, f"val/KRCC-{suffix}": k, f"val/RMSE-{suffix}": r})
+    try:
+        wandb.log({f"val/SRCC-{suffix}": s, f"val/PLCC-{suffix}": p, f"val/KRCC-{suffix}": k, f"val/RMSE-{suffix}": r})
+    except:
+        pass
 
     best_s, best_p, best_k, best_r = (
         max(best_s, s),
@@ -97,15 +110,17 @@ def inference_set(inf_loader, model, device, best_, save_model=False, suffix='s'
         min(best_r, r),
     )
 
-    wandb.log(
-        {
-            f"val/best_SRCC-{suffix}": best_s,
-            f"val/best_PLCC-{suffix}": best_p,
-            f"val/best_KRCC-{suffix}": best_k,
-            f"val/best_RMSE-{suffix}": best_r,
-        }
-    )
-
+    try:
+        wandb.log(
+            {
+                f"val/best_SRCC-{suffix}": best_s,
+                f"val/best_PLCC-{suffix}": best_p,
+                f"val/best_KRCC-{suffix}": best_k,
+                f"val/best_RMSE-{suffix}": best_r,
+            }
+        )
+    except:
+        pass
     print(
         f"For {len(inf_loader)} videos, \nthe accuracy of the model: [{suffix}] is as follows:\n  SROCC: {s:.4f} best: {best_s:.4f} \n  PLCC:  {p:.4f} best: {best_p:.4f}  \n  KROCC: {k:.4f} best: {best_k:.4f} \n  RMSE:  {r:.4f} best: {best_r:.4f}."
     )
@@ -130,6 +145,7 @@ def main():
     ## adaptively choose the device
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    #device = "cpu"
 
     ## defining model and loading checkpoint
 
@@ -162,9 +178,11 @@ def main():
             fusion_state_dict[ki] = v
         
         state_dict = fusion_state_dict
+        
+    #torch.save(state_dict, "dover.pth")
+    #exit()
 
     model.load_state_dict(state_dict, strict=True)
-    
     
     for key in opt["data"].keys():
         
@@ -186,7 +204,7 @@ def main():
 
 
 
-        profile_inference(val_dataset, model, device)    
+        profile_inference(val_dataset, model, device)
 
         # test the model
         print(len(val_loader))
@@ -198,6 +216,7 @@ def main():
             val_loader,
             model,
             device, best_,
+            set_name=key,
         )
 
         print(

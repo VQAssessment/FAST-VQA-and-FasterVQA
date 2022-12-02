@@ -362,18 +362,6 @@ def main():
         num_splits = 1
         
     for split in range(num_splits):
-
-        train_datasets = {}
-        for key in opt["data"]:
-            if key.startswith("train"):
-                train_dataset = getattr(datasets, opt["data"][key]["type"])(opt["data"][key]["args"])
-                train_datasets[key] = train_dataset
-        
-        train_loaders = {}
-        for key, train_dataset in train_datasets.items():
-            train_loaders[key] = torch.utils.data.DataLoader(
-                train_dataset, batch_size=opt["batch_size"], num_workers=opt["num_workers"], shuffle=True,
-            )
         
         val_datasets = {}
         for key in opt["data"]:
@@ -387,6 +375,20 @@ def main():
             val_loaders[key] = torch.utils.data.DataLoader(
                 val_dataset, batch_size=1, num_workers=opt["num_workers"], pin_memory=True,
             )
+
+        train_datasets = {}
+        for key in opt["data"]:
+            if key.startswith("train"):
+                train_dataset = getattr(datasets, opt["data"][key]["type"])(opt["data"][key]["args"])
+                train_datasets[key] = train_dataset
+        
+        train_loaders = {}
+        for key, train_dataset in train_datasets.items():
+            train_loaders[key] = torch.utils.data.DataLoader(
+                train_dataset, batch_size=opt["batch_size"], num_workers=opt["num_workers"], shuffle=True,
+            )
+        
+        
 
 
         run = wandb.init(
@@ -434,9 +436,12 @@ def main():
 
                 i_state_dict = OrderedDict()
                 for key in state_dict.keys():
+                    if "head" in key:
+                        continue
                     if "cls" in key:
                         tkey = key.replace("cls", "vqa")
                     elif "backbone" in key:
+                        i_state_dict[key] = state_dict[key]
                         i_state_dict["fragments_"+key] = state_dict[key]
                         i_state_dict["resize_"+key] = state_dict[key]
                     else:
@@ -446,7 +451,7 @@ def main():
                 if key in i_state_dict and i_state_dict[key].shape != value.shape:
                     i_state_dict.pop(key)
             
-            model.load_state_dict(i_state_dict, strict=False)
+            print(model.load_state_dict(i_state_dict, strict=False))
             
         #print(model)
 

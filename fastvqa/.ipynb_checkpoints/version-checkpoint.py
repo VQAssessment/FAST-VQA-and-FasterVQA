@@ -1,4 +1,4 @@
-__version__ = "3.0.0-fastervqa"
+__version__ = "3.1.0"
 
 
 def parse_version_info(version_str):

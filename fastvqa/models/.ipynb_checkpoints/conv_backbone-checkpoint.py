@@ -240,7 +240,7 @@ class ConvNeXt3D(nn.Module):
             trunc_normal_(m.weight, std=.02)
             nn.init.constant_(m.bias, 0)
 
-    def forward_features(self, x, return_spatial=False, multi=False):
+    def forward_features(self, x, return_spatial=False, multi=False, layer=-1):
         if multi:
             xs = []
         for i in range(4):
@@ -251,13 +251,15 @@ class ConvNeXt3D(nn.Module):
         if return_spatial:
             if multi:
                 shape = xs[-1].shape[2:]
-                return torch.cat([F.interpolate(x,size=shape, mode="trilinear") for x in xs[:-1]] + [self.norm(x.permute(0, 2, 3, 4, 1)).permute(0, 4, 1, 2, 3)], 1)
+                return torch.cat([F.interpolate(x,size=shape, mode="trilinear") for x in xs[:-1]], 1) #+ [self.norm(x.permute(0, 2, 3, 4, 1)).permute(0, 4, 1, 2, 3)], 1)
+            elif layer > -1:
+                return xs[layer]
             else:
                 return self.norm(x.permute(0, 2, 3, 4, 1)).permute(0, 4, 1, 2, 3)
         return self.norm(x.mean([-3, -2, -1])) # global average pooling, (N, C, T, H, W) -> (N, C)
 
-    def forward(self, x, multi=False):
-        x = self.forward_features(x, True, multi=multi)
+    def forward(self, x, multi=False, layer=-1):
+        x = self.forward_features(x, True, multi=multi, layer=layer)
         return x
 
 
@@ -316,6 +318,7 @@ def convnext_xlarge(pretrained=False, in_22k=False, **kwargs):
     return model
 
 def convnext_3d_tiny(pretrained=False, in_22k=False, **kwargs):
+    print("Using Imagenet 22K pretrain", in_22k)
     model = ConvNeXt3D(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], **kwargs)
     if pretrained:
         url = model_urls['convnext_tiny_22k'] if in_22k else model_urls['convnext_tiny_1k']

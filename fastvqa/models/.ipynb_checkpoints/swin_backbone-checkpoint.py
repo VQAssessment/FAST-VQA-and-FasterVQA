@@ -60,7 +60,7 @@ def get_adaptive_window_size(
     tx, hx, wx = base_x_size
     print((tw * tx_) // tx, (hw * hx_) // hx, (ww * wx_) // wx)
     return (tw * tx_) // tx, (hw * hx_) // hx, (ww * wx_) // wx
-    
+
 
 
 class Mlp(nn.Module):
@@ -1033,7 +1033,7 @@ class SwinTransformer3D(nn.Module):
             
     
 
-    def forward(self, x, multi=False, adaptive_window_size=False):
+    def forward(self, x, multi=False, layer=-1, adaptive_window_size=True):
         
         """Forward function."""
         if adaptive_window_size:
@@ -1044,22 +1044,23 @@ class SwinTransformer3D(nn.Module):
         x = self.patch_embed(x)
 
         x = self.pos_drop(x)
-
-        if multi:
-            feats = [x]
+        feats = [x]
             
 
-        for layer in self.layers:
-            x = layer(x.contiguous(), resized_window_size)
-            if multi:
-                feats += [x]
+        for l, mlayer in enumerate(self.layers):
+            x = mlayer(x.contiguous(), resized_window_size)     
+            feats += [x]
 
         x = rearrange(x, "n c d h w -> n d h w c")
         x = self.norm(x)
         x = rearrange(x, "n d h w c -> n c d h w")
 
         if multi:
-            return feats[:-1] + [x]
+            shape = x.shape[2:]
+            return torch.cat([F.interpolate(xi,size=shape, mode="trilinear") for xi in feats[:-1]], 1)
+        elif layer > -1:
+            print("something", len(feats))
+            return feats[layer]
         else:
             return x
 
