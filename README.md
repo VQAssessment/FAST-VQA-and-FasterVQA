@@ -74,11 +74,15 @@ The quality score of the video (range [0,1]) is 0.44953.
 
 The result is now rescaled into between [0,1] with a sigmoid function.
 
-Score near 0: extremely bad quality.
-Score 0.25: bad quality.
-Score 0.5: fair quality.
-Score 0.75: good quality.
-Score near 1.0: extremely good quality.
+<span style="color:red">Score near 0: extremely bad quality.</span>.
+
+<span style="color:orange">Score 0.25: bad quality.</span>
+
+<span style="color:yellow">Score 0.5: fair quality.</span>
+
+<span style="color:#A5DF00"> Score 0.75: good quality.</span>
+
+<span style="color:green">Score near 1.0: extremely good quality.</span>
 
 
 ## See our Weights & Biases training logs
