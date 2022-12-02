@@ -2,6 +2,7 @@
 
 ![visitors](https://visitor-badge.laobi.icu/badge?page_id=TimothyHTimothy/FAST-VQA-and-FasterVQA) 
 
+- 2 Dec, 2022: Upgraded the default inference script.
 - 10 Nov, 2022: Release of the [ECVA official version](https://www.ecva.net/papers/eccv_2022/papers_ECCV/html/1225_ECCV_2022_paper.php), and our future work DOVER based on FAST-VQA with even better performance: [PDF](arxiv.org/pdf/2211.04894), [abstract](arxiv.org/abs/2211.04894), [GitHub](https://github.com/teowu/DOVER).
 - 12 Oct, 2022: Release of pre-print FasterVQA paper: [PDF](arxiv.org/pdf/2210.05357), [Abstract](arxiv.org/abs/2210.05357).
 - 27 Sep, 2022: Release of FasterVQA models: 4X more efficient, 14X real-time inference on Apple M1 CPU (for FasterVQA-MT, tested on my old Mac).
@@ -48,13 +49,37 @@ In this release, we have refactored the training and testing code. The refactore
 ![Fig](demos/fastervqa.png)
 
 
-## Infer for a single MP4 video
+## [Upgraded] Infer for a single MP4 video
 
 ```
-python vqa.py -d [YOUR_INPUT_FILE_PATH]
+python vqa.py -m [MODEL_TYPE] -d [YOUR_INPUT_FILE_PATH]
 ```
 
-The default one is for a video in KoNViD-1k with FasterVQA, which should get a score around 0.133.
+`MODEL_TYPE` can be chosen in FasterVQA, FAST-VQA, and their efficient versions, FasterVQA-MS, FasterVQA-MT, FAST-VQA-M.
+
+Outputs for default `python vqa.py` (inferring with FasterVQA) can be:
+
+```
+Inferring with model [FasterVQA]:
+The quality score of the video (range [0,1]) is 0.42326.
+```
+
+
+Outputs for `python vqa.py -m FAST-VQA` (inferring with FAST-VQA) can be:
+
+```
+Inferring with model [FAST-VQA]:
+The quality score of the video (range [0,1]) is 0.44953.
+```
+
+The result is now rescaled into between [0,1] with a sigmoid function.
+
+Score near 0: extremely bad quality.
+Score 0.25: bad quality.
+Score 0.5: fair quality.
+Score 0.75: good quality.
+Score near 1.0: extremely good quality.
+
 
 ## See our Weights & Biases training logs
 
@@ -143,16 +168,12 @@ pip install -r requirements.txt
 You can run
 
 ```shell
-pip install .
+git clone htps://github.com/QualityAssessment/FAST-VQA-and-FasterVQA.git
+cd FAST-VQA-and-FasterVQA
+pip install -e .
 ```
 
-or 
-
-```shell
-python setup.py installl
-```
-
-to install the full FAST-VQA with its requirements.
+to install the full FAST-VQA with its requirements. The `-e` option allows you to import your customized version of the package.
 
 ## Usage
 使用方法
