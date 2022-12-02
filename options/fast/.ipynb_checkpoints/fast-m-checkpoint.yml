@@ -24,9 +24,9 @@ data:
                     fsize_h: 32
                     fsize_w: 32
                     aligned: 8
-            clip_len: 16
-            frame_interval: 2
-            num_clips: 1
+                    clip_len: 16
+                    frame_interval: 2
+                    num_clips: 1
     val-livevqc:
         type: FusionDataset
         args:
@@ -40,9 +40,9 @@ data:
                     fsize_h: 32
                     fsize_w: 32
                     aligned: 8
-            clip_len: 16
-            frame_interval: 2
-            num_clips: 4
+                    clip_len: 16
+                    frame_interval: 2
+                    num_clips: 4
         
 model:
     type: DiViDeAddEvaluator

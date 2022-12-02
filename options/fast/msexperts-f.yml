@@ -1,14 +1,14 @@
-name: FAST-VQA-M-Refactor-1*4
-num_epochs: 30
-l_num_epochs: 0
-warmup_epochs: 2.5
+name: MoLEx-MsExperts-F
+num_epochs: 0
+l_num_epochs: 3
+warmup_epochs: 1
 ema: true
 save_model: true
 batch_size: 16
 num_workers: 6
 
 wandb:
-    project_name: VQA_Experiments_2022
+    project_name: MoLEx_for_CVPR_2023
 
 data:
     train:
@@ -19,14 +19,16 @@ data:
             data_prefix: ../datasets/LSVQ
             sample_types:
                 fragments:
-                    fragments_h: 4
-                    fragments_w: 4
+                    fragments_h: 7
+                    fragments_w: 7
                     fsize_h: 32
                     fsize_w: 32
-                    aligned: 8
-                    clip_len: 16
+                    aligned: 32
+                    clip_len: 32
                     frame_interval: 2
                     num_clips: 1
+
+            
     val-livevqc:
         type: FusionDataset
         args:
@@ -34,28 +36,36 @@ data:
             anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
             data_prefix: ../datasets/LIVE_VQC/
             sample_types:
+                #resize:
+                #    size_h: 224
+                #    size_w: 224
                 fragments:
-                    fragments_h: 4
-                    fragments_w: 4
+                    fragments_h: 7
+                    fragments_w: 7
                     fsize_h: 32
                     fsize_w: 32
-                    aligned: 8
-                    clip_len: 16
+                    aligned: 32
+                    clip_len: 32
                     frame_interval: 2
                     num_clips: 4
-        
+
+
+
+
+
 model:
     type: DiViDeAddEvaluator
     args:
+        multi: true
         backbone:
             fragments:
+                type: swin_tiny_grpb
                 checkpoint: false
-                pretrained: 
-        backbone_size: swin_tiny_grpb_m
+                pretrained:
         backbone_preserve_keys: fragments
-        divide_head: false
+        divide_head: true
         vqa_head:
-            in_channels: 768
+            in_channels: 1440
             hidden_channels: 64
             
 optimizer:
@@ -63,9 +73,7 @@ optimizer:
     backbone_lr_mult: !!float 1e-1
     wd: 0.05
         
-load_path: ../pretrained/swin_tiny_patch244_window877_kinetics400_1k.pth
-test_load_path: ./pretrained_weights/FAST_VQA_M_1*4.pth
+load_path: ./pretrained_weights/FAST_VQA_B_1*4.pth
 
     
         
-

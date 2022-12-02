@@ -1,4 +1,5 @@
-name: FAST-VQA-M-Refactor-1*4
+name: DOVER-QEuC-Branch-ConvNeXt-32-Faster-Fragments
+
 num_epochs: 30
 l_num_epochs: 0
 warmup_epochs: 2.5
@@ -6,6 +7,10 @@ ema: true
 save_model: true
 batch_size: 16
 num_workers: 6
+
+need_upsampled: false
+need_feat: false
+need_fused: false
 
 wandb:
     project_name: VQA_Experiments_2022
@@ -19,14 +24,34 @@ data:
             data_prefix: ../datasets/LSVQ
             sample_types:
                 fragments:
-                    fragments_h: 4
-                    fragments_w: 4
+                    fragments_h: 7 #7
+                    fragments_w: 7 #7
                     fsize_h: 32
                     fsize_w: 32
                     aligned: 8
-                    clip_len: 16
+                    clip_len: 32 #32
                     frame_interval: 2
+                    t_frag: 8 #8
                     num_clips: 1
+
+    val-kv1k:
+        type: FusionDataset
+        args:
+            phase: test
+            anno_file: ./examplar_data_labels/KoNViD/labels.txt
+            data_prefix: ../datasets/KoNViD/
+            sample_types:
+                fragments:
+                    fragments_h: 7 #7
+                    fragments_w: 7 #7
+                    fsize_h: 32
+                    fsize_w: 32
+                    aligned: 8
+                    clip_len: 32 #32
+                    frame_interval: 2
+                    t_frag: 8 #8
+                    num_clips: 1
+            
     val-livevqc:
         type: FusionDataset
         args:
@@ -35,25 +60,24 @@ data:
             data_prefix: ../datasets/LIVE_VQC/
             sample_types:
                 fragments:
-                    fragments_h: 4
-                    fragments_w: 4
+                    fragments_h: 7 #7
+                    fragments_w: 7 #7
                     fsize_h: 32
                     fsize_w: 32
                     aligned: 8
-                    clip_len: 16
+                    clip_len: 32 #32
                     frame_interval: 2
-                    num_clips: 4
-        
+                    t_frag: 8 #8
+                    num_clips: 1
+
 model:
     type: DiViDeAddEvaluator
     args:
         backbone:
             fragments:
-                checkpoint: false
-                pretrained: 
-        backbone_size: swin_tiny_grpb_m
+                type: conv_tiny
         backbone_preserve_keys: fragments
-        divide_head: false
+        divide_head: true
         vqa_head:
             in_channels: 768
             hidden_channels: 64
@@ -63,8 +87,8 @@ optimizer:
     backbone_lr_mult: !!float 1e-1
     wd: 0.05
         
-load_path: ../pretrained/swin_tiny_patch244_window877_kinetics400_1k.pth
-test_load_path: ./pretrained_weights/FAST_VQA_M_1*4.pth
+
+
 
     
         

@@ -84,10 +84,9 @@ model:
     args:
         backbone_size: conv_tiny
         backbone_preserve_keys: resize
-        multi: true
         divide_head: true # if true, different branches will not share head
         vqa_head:
-            in_channels: 1440
+            in_channels: 768
             hidden_channels: 64
             
 optimizer:

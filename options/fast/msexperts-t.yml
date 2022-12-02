@@ -1,58 +1,60 @@
-name: FAST-VQA-with-Conv-Backbone-Resize-S
-
-num_epochs: 30
-l_num_epochs: 0
-warmup_epochs: 2.5
+name: MoLEx-MsExperts-T
+num_epochs: 0
+l_num_epochs: 3
+warmup_epochs: 1
 ema: true
 save_model: true
 batch_size: 16
 num_workers: 6
 
-need_upsampled: false
-need_feat: false
-need_fused: false
-
 wandb:
-    project_name: VQA_Experiments_2022
+    project_name: MoLEx_for_CVPR_2023
 
 data:
     train:
         type: FusionDataset
         args:
             phase: train
-            random_crop: false
             anno_file: ./examplar_data_labels/train_labels.txt
             data_prefix: ../datasets/LSVQ
             sample_types:
                 resize:
                     size_h: 224
                     size_w: 224
-            clip_len: 32
-            frame_interval: 2
-            num_clips: 1
-    val:
+                    clip_len: 32
+                    frame_interval: 2
+                    num_clips: 1
+            
+    val-livevqc:
         type: FusionDataset
         args:
             phase: test
             anno_file: ./examplar_data_labels/LIVE_VQC/labels.txt
-            data_prefix: ../datasets/LIVE_VQC
+            data_prefix: ../datasets/LIVE_VQC/
             sample_types:
                 resize:
                     size_h: 224
                     size_w: 224
-            clip_len: 32
-            frame_interval: 2
-            num_clips: 4
+                    clip_len: 32
+                    frame_interval: 2
+                    num_clips: 4
+
+
+
+
+
+
 model:
     type: DiViDeAddEvaluator
     args:
+        multi: true
         backbone:
-            pretrained: false
-        backbone_size: conv_tiny
+            resize:
+                type: conv_tiny
         backbone_preserve_keys: resize
-        divide_head: true # if true, different branches will not share head
+        divide_head: true
         vqa_head:
-            in_channels: 768
+            in_channels: 672
             hidden_channels: 64
             
 optimizer:
@@ -60,10 +62,7 @@ optimizer:
     backbone_lr_mult: !!float 1e-1
     wd: 0.05
         
-test_load_path: ./pretrained_weights/FAST-VQA-with-Conv-Backbone-Resize_s_dev_v0.0.pth
-
-
+load_path: ./pretrained_weights/FAST-VQA-with-Conv-Backbone-Resize_s_dev_v0.0.pth
 
     
         
-
