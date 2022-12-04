@@ -91,7 +91,7 @@ The result is now rescaled into between [0,1] with a sigmoid function.
 
 We are reproducing several experiments and making public our training logs here.
 
-https://wandb.ai/timothyhwu/Open_FAST_VQA
+[传送门/Gate to Curves](https://wandb.ai/timothyhwu/Open_FAST_VQA)
 
 Now supports:
 - FasterVQA-finetuned-to-KonViD-1k
