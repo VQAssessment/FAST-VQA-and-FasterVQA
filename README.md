@@ -80,7 +80,7 @@ The result is now rescaled into between [0,1] with a sigmoid function.
 
 <span style="color:yellow">Score 0.5: fair quality.</span>
 
-<span style="color:#A5DF00"> Score 0.75: good quality.</span>t
+<span style="color:#A5DF00"> Score 0.75: good quality.</span>
 
 <span style="color:green">Score near 1.0: extremely good quality.</span>
 
@@ -284,7 +284,7 @@ Supported datasets are KoNViD-1k, LIVE_VQC, CVD2014, LIVE-Qualcomm, YouTube-UGC.
 ## Citation
 
 The following paper is to be cited in the bibliography if relevant papers are proposed.
-```
+```bibtex
 @article{wu2022fastquality,
   title={FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling},
   author={Wu, Haoning and Chen, Chaofeng and Hou, Jingwen and Liao, Liang and Wang, Annan and Sun, Wenxiu and Yan, Qiong and Lin, Weisi},
@@ -294,7 +294,7 @@ The following paper is to be cited in the bibliography if relevant papers are pr
 ```
 
 And this code library if it is used.
-```
+```bibtex
 @misc{end2endvideoqualitytool,
   title = {Open Source Deep End-to-End Video Quality Assessment Toolbox},
   author = {Wu, Haoning},
