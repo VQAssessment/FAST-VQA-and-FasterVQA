@@ -1,6 +1,7 @@
 # FAST-VQA/FasterVQA
 
-![visitors](https://visitor-badge.laobi.icu/badge?page_id=TimothyHTimothy/FAST-VQA-and-FasterVQA) [![](https://img.shields.io/github/stars/QualityAssessment/FAST-VQA-and-FasterVQA)](https://github.com/QualityAssessment/FAST-VQA-and-FasterVQA)
+
+![visitors](https://visitor-badge.laobi.icu/badge?page_id=TimothyHTimothy/FAST-VQA-and-FasterVQA) [![](https://img.shields.io/github/stars/QualityAssessment/FAST-VQA-and-FasterVQA)](https://github.com/QualityAssessment/FAST-VQA-and-FasterVQA) [![State-of-the-Art](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/QualityAssessment/DOVER)
 
 - 2 Dec, 2022: Upgraded the default inference script.
 - 10 Nov, 2022: Release of the [ECVA official version](https://www.ecva.net/papers/eccv_2022/papers_ECCV/html/1225_ECCV_2022_paper.php), and our future work DOVER based on FAST-VQA with even better performance: [PDF](arxiv.org/pdf/2211.04894), [abstract](arxiv.org/abs/2211.04894), [GitHub](https://github.com/teowu/DOVER).
