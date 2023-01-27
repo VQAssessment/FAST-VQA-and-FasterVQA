@@ -8,3 +8,5 @@ numpy
 tqdm
 timm
 einops
+clip
+sk-video
