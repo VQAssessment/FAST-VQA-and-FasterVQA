@@ -284,8 +284,18 @@ Supported datasets are KoNViD-1k, LIVE_VQC, CVD2014, LIVE-Qualcomm, YouTube-UGC.
 
 ## Citation
 
-The following paper is to be cited in the bibliography if relevant papers are proposed.
+The following papers are to be cited in the bibliography if relevant papers are proposed.
+
+
 ```bibtex
+@misc{wu2022fasterquality,
+      title={Neighbourhood Representative Sampling for Efficient End-to-end Video Quality Assessment}, 
+      author={Haoning Wu and Chaofeng Chen and Liang Liao and Jingwen Hou and Wenxiu Sun and Qiong Yan and Jinwei Gu and Weisi Lin},
+      year={2022},
+      eprint={2210.05357},
+      archivePrefix={arXiv}
+}
+
 @article{wu2022fastquality,
   title={FAST-VQA: Efficient End-to-end Video Quality Assessment with Fragment Sampling},
   author={Wu, Haoning and Chen, Chaofeng and Hou, Jingwen and Liao, Liang and Wang, Annan and Sun, Wenxiu and Yan, Qiong and Lin, Weisi},
