@@ -53,7 +53,7 @@ In this release, we have refactored the training and testing code. The refactore
 ## [Upgraded] Infer for a single MP4 video
 
 ```
-python vqa.py -m [MODEL_TYPE] -d [YOUR_INPUT_FILE_PATH]
+python vqa.py -m [MODEL_TYPE] -v [YOUR_INPUT_FILE_PATH]
 ```
 
 `MODEL_TYPE` can be chosen in FasterVQA, FAST-VQA, and their efficient versions, FasterVQA-MS, FasterVQA-MT, FAST-VQA-M.
