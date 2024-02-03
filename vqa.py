@@ -1,9 +1,9 @@
 
+import torch
 import yaml
 import decord
 from fastvqa.datasets import get_spatial_fragments, SampleFrames, FragmentSampleFrames
 from fastvqa.models import DiViDeAddEvaluator
-import torch
 import numpy as np
 import argparse
 
